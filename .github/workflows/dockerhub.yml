@@ -78,12 +78,16 @@ jobs:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
         run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'DEPLOY_EOF'
             # Login to DockerHub
-            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
             
-            # Pull latest image
-            docker pull ${IMAGE_NAME}:latest
+            # Pull latest image (suppress verbose output)
+            echo "Pulling latest image..."
+            docker pull ${{ env.IMAGE_NAME }}:latest > /dev/null 2>&1 || {
+              echo "Failed to pull image, trying with verbose output..."
+              docker pull ${{ env.IMAGE_NAME }}:latest
+            }
             
             # Stop and remove existing containers (check all possible names)
             echo "Stopping and removing existing containers..."
@@ -92,7 +96,7 @@ jobs:
             
             # Check if port 8080 is in use and free it
             echo "Checking for containers using port 8080..."
-            CONTAINERS_USING_PORT=$(docker ps -a --filter "publish=8080" --format "{{.Names}}" 2>/dev/null || true)
+            CONTAINERS_USING_PORT=$(docker ps -a --filter "publish=8080" --format "{{.Names}}" 2>/dev/null || echo "")
             if [ ! -z "$CONTAINERS_USING_PORT" ]; then
               echo "Found containers using port 8080: $CONTAINERS_USING_PORT"
               echo "$CONTAINERS_USING_PORT" | while read container_name; do
@@ -106,7 +110,7 @@ jobs:
             
             # Also check by image name
             echo "Checking for containers using the image..."
-            CONTAINERS_BY_IMAGE=$(docker ps -a --filter "ancestor=${IMAGE_NAME}:latest" --format "{{.Names}}" 2>/dev/null || true)
+            CONTAINERS_BY_IMAGE=$(docker ps -a --filter "ancestor=${{ env.IMAGE_NAME }}:latest" --format "{{.Names}}" 2>/dev/null || echo "")
             if [ ! -z "$CONTAINERS_BY_IMAGE" ]; then
               echo "Found containers using image: $CONTAINERS_BY_IMAGE"
               echo "$CONTAINERS_BY_IMAGE" | while read container_name; do
@@ -120,7 +124,7 @@ jobs:
             
             # Verify image exists
             echo "=== Verifying image ==="
-            docker images | grep "${IMAGE_NAME}" || echo "Image not found!"
+            docker images | grep "${{ env.IMAGE_NAME }}" || echo "Image not found!"
             echo ""
             
             # Run new container with environment variables
@@ -129,40 +133,48 @@ jobs:
               --name api.minsol.kr \
               --restart unless-stopped \
               -p 8080:8080 \
-              -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
-              -e SPRING_DATASOURCE_URL="${DATABASE_URL}" \
-              -e SPRING_DATASOURCE_USERNAME="${DB_USER}" \
-              -e SPRING_DATASOURCE_PASSWORD="${DB_PASSWORD}" \
-              -e SPRING_JPA_HIBERNATE_DDL_AUTO="${SPRING_JPA_HIBERNATE_DDL_AUTO}" \
-              -e SPRING_JPA_SHOW_SQL="${SPRING_JPA_SHOW_SQL}" \
-              -e SPRING_REDIS_HOST="${UPSTASH_REDIS_HOST}" \
-              -e SPRING_REDIS_PORT="${UPSTASH_REDIS_PORT}" \
-              -e SPRING_REDIS_PASSWORD="${UPSTASH_REDIS_PASSWORD}" \
-              -e SPRING_REDIS_SSL_ENABLED="${SPRING_REDIS_SSL_ENABLED}" \
-              -e REDIS_HOST="${UPSTASH_REDIS_HOST}" \
-              -e REDIS_PORT="${UPSTASH_REDIS_PORT}" \
-              -e REDIS_PASSWORD="${UPSTASH_REDIS_PASSWORD}" \
-              -e REDIS_URL="${UPSTASH_REDIS_URL}" \
-              -e REDIS_ENABLED="${REDIS_ENABLED}" \
-              -e JWT_SECRET="${JWT_SECRET}" \
-              -e JWT_ACCESS_TOKEN_EXPIRATION="${JWT_ACCESS_TOKEN_EXPIRATION}" \
-              -e JWT_REFRESH_TOKEN_EXPIRATION="${JWT_REFRESH_TOKEN_EXPIRATION}" \
-              -e KAKAO_REST_API_KEY="${KAKAO_REST_API_KEY}" \
-              -e KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI}" \
-              -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}" \
-              -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}" \
-              -e GOOGLE_REDIRECT_URI="${GOOGLE_REDIRECT_URI}" \
-              -e NAVER_CLIENT_ID="${NAVER_CLIENT_ID}" \
-              -e NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET}" \
-              -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI}" \
-              ${IMAGE_NAME}:latest 2>&1)
+              -e SPRING_PROFILES_ACTIVE="${{ secrets.SPRING_PROFILES_ACTIVE || 'production' }}" \
+              -e SPRING_DATASOURCE_URL="${{ secrets.DATABASE_URL }}" \
+              -e SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USER }}" \
+              -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              -e SPRING_JPA_HIBERNATE_DDL_AUTO="${{ secrets.SPRING_JPA_HIBERNATE_DDL_AUTO || 'none' }}" \
+              -e SPRING_JPA_SHOW_SQL="${{ secrets.SPRING_JPA_SHOW_SQL || 'false' }}" \
+              -e SPRING_REDIS_HOST="${{ secrets.UPSTASH_REDIS_HOST }}" \
+              -e SPRING_REDIS_PORT="${{ secrets.UPSTASH_REDIS_PORT }}" \
+              -e SPRING_REDIS_PASSWORD="${{ secrets.UPSTASH_REDIS_PASSWORD }}" \
+              -e SPRING_REDIS_SSL_ENABLED="${{ secrets.SPRING_REDIS_SSL_ENABLED || 'true' }}" \
+              -e REDIS_HOST="${{ secrets.UPSTASH_REDIS_HOST }}" \
+              -e REDIS_PORT="${{ secrets.UPSTASH_REDIS_PORT }}" \
+              -e REDIS_PASSWORD="${{ secrets.UPSTASH_REDIS_PASSWORD }}" \
+              -e REDIS_URL="${{ secrets.UPSTASH_REDIS_URL }}" \
+              -e REDIS_ENABLED="${{ secrets.REDIS_ENABLED || 'true' }}" \
+              -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              -e JWT_ACCESS_TOKEN_EXPIRATION="${{ secrets.JWT_ACCESS_TOKEN_EXPIRATION }}" \
+              -e JWT_REFRESH_TOKEN_EXPIRATION="${{ secrets.JWT_REFRESH_TOKEN_EXPIRATION }}" \
+              -e KAKAO_REST_API_KEY="${{ secrets.KAKAO_REST_API_KEY }}" \
+              -e KAKAO_REDIRECT_URI="${{ secrets.KAKAO_REDIRECT_URI }}" \
+              -e GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+              -e GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              -e GOOGLE_REDIRECT_URI="${{ secrets.GOOGLE_REDIRECT_URI }}" \
+              -e NAVER_CLIENT_ID="${{ secrets.NAVER_CLIENT_ID }}" \
+              -e NAVER_CLIENT_SECRET="${{ secrets.NAVER_CLIENT_SECRET }}" \
+              -e NAVER_REDIRECT_URI="${{ secrets.NAVER_REDIRECT_URI }}" \
+              ${{ env.IMAGE_NAME }}:latest 2>&1)
             
-            echo "Container run output: $CONTAINER_ID"
+            echo "Container started with ID: $CONTAINER_ID"
             
-            # Check if container was created successfully
-            if [ -z "$CONTAINER_ID" ] || echo "$CONTAINER_ID" | grep -q "Error"; then
+            # Check if container was created successfully (should be a valid container ID)
+            if [ -z "$CONTAINER_ID" ] || echo "$CONTAINER_ID" | grep -qiE "(error|failed|cannot)"; then
               echo "⚠️ Failed to start container!"
-              echo "Error: $CONTAINER_ID"
+              echo "Error output: $CONTAINER_ID"
+              exit 1
+            fi
+            
+            # Verify it's a valid container ID (12+ hex characters)
+            if ! echo "$CONTAINER_ID" | grep -qE "^[0-9a-f]{12,}$"; then
+              echo "⚠️ Invalid container ID: $CONTAINER_ID"
+              echo "Checking container status..."
+              docker ps -a | grep api.minsol.kr || echo "Container not found"
               exit 1
             fi
             
@@ -201,7 +213,7 @@ jobs:
             
             # Clean up old images
             docker image prune -f
-          EOF
+          DEPLOY_EOF
 
       - name: Wait and verify container
         run: |
@@ -221,8 +233,6 @@ jobs:
               echo "Checking all containers..."
               docker ps -a
               echo ""
-              echo "Checking for containers using image ${IMAGE_NAME}..."
-              docker ps -a --filter "ancestor=${IMAGE_NAME}:latest" || echo "No containers found with this image"
               # Check for any container using port 8080
               CONTAINER_ON_PORT=$(docker ps -a --filter "publish=8080" --format "{{.Names}}" | head -n 1)
               if [ ! -z "$CONTAINER_ON_PORT" ]; then
@@ -292,9 +302,6 @@ jobs:
               echo "⚠️ Container '$CONTAINER_NAME' does not exist!"
               echo "All containers:"
               docker ps -a
-              echo ""
-              echo "Checking for containers using image ${IMAGE_NAME}..."
-              docker ps -a --filter "ancestor=${IMAGE_NAME}:latest" || echo "No containers found with this image"
               exit 1
             fi
             
