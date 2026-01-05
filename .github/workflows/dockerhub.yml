@@ -97,7 +97,7 @@ jobs:
             fi
             
             # Run new container with environment variables
-            docker run -d \
+            CONTAINER_ID=$(docker run -d \
               --name api.minsol.kr \
               --restart unless-stopped \
               -p 8080:8080 \
@@ -127,69 +127,115 @@ jobs:
               -e NAVER_CLIENT_ID="${NAVER_CLIENT_ID}" \
               -e NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET}" \
               -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI}" \
-              ${IMAGE_NAME}:latest
+              ${IMAGE_NAME}:latest)
+            
+            echo "Container started with ID: $CONTAINER_ID"
             
             # Wait a bit and check container status
             sleep 5
-            echo "Container status:"
+            echo "=== Container Status ==="
             docker ps -a | grep api.minsol.kr || echo "Container not found"
+            echo ""
+            echo "=== Initial Container Logs ==="
+            docker logs --tail 20 api.minsol.kr || echo "Cannot read logs"
             
             # Clean up old images
             docker image prune -f
           EOF
 
-      - name: Wait for application to start
-        run: |
-          echo "Waiting for application to start..."
-          sleep 20
-
-      - name: Check container status
+      - name: Wait and verify container
         run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            echo "Waiting for application to start..."
+            sleep 30
+            
             echo "=== Container Status ==="
             docker ps -a | grep api.minsol.kr || echo "Container not found"
             echo ""
-            echo "=== Container Logs (last 50 lines) ==="
-            docker logs --tail 50 api.minsol.kr || echo "Cannot read logs"
+            
+            echo "=== Container Logs (last 100 lines) ==="
+            docker logs --tail 100 api.minsol.kr 2>&1 || echo "Cannot read logs"
+            echo ""
+            
+            echo "=== Port 8080 Status ==="
+            netstat -tlnp | grep 8080 || ss -tlnp | grep 8080 || echo "Port 8080 not listening"
+            echo ""
+            
+            echo "=== Container Health ==="
+            CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' api.minsol.kr 2>/dev/null || echo "not found")
+            echo "Container status: $CONTAINER_STATUS"
+            
+            if [ "$CONTAINER_STATUS" != "running" ]; then
+              echo "⚠️ Container is not running!"
+              echo "Exit code: $(docker inspect -f '{{.State.ExitCode}}' api.minsol.kr 2>/dev/null || echo 'N/A')"
+              exit 1
+            fi
           EOF
 
       - name: Health Check with retry
         run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            MAX_RETRIES=5
-            RETRY_DELAY=10
+            MAX_RETRIES=6
+            RETRY_DELAY=15
             
             for i in $(seq 1 $MAX_RETRIES); do
               echo "Health check attempt $i/$MAX_RETRIES..."
               
+              # Check if container is running
+              if ! docker ps | grep -q api.minsol.kr; then
+                echo "⚠️ Container is not running!"
+                docker ps -a | grep api.minsol.kr
+                if [ $i -eq $MAX_RETRIES ]; then
+                  echo "Container logs:"
+                  docker logs --tail 50 api.minsol.kr 2>&1 || true
+                  exit 1
+                fi
+                echo "Waiting for container to start..."
+                sleep $RETRY_DELAY
+                continue
+              fi
+              
               # Try /api/gateway/status first
-              if curl -f -s http://localhost:8080/api/gateway/status > /dev/null 2>&1; then
-                echo "✓ /api/gateway/status is healthy"
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/gateway/status 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✓ /api/gateway/status is healthy (HTTP $HTTP_CODE)"
+                curl -s http://localhost:8080/api/gateway/status | head -c 200
+                echo ""
                 exit 0
               fi
               
               # Try /actuator/health as fallback
-              if curl -f -s http://localhost:8080/actuator/health > /dev/null 2>&1; then
-                echo "✓ /actuator/health is healthy"
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✓ /actuator/health is healthy (HTTP $HTTP_CODE)"
                 exit 0
               fi
               
               # Try root path
-              if curl -f -s http://localhost:8080/ > /dev/null 2>&1; then
-                echo "✓ Root path is accessible"
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" != "000" ] && [ "$HTTP_CODE" != "404" ]; then
+                echo "✓ Root path is accessible (HTTP $HTTP_CODE)"
                 exit 0
               fi
               
+              echo "Health check failed (HTTP codes: /api/gateway/status=$HTTP_CODE, /actuator/health=$HTTP_CODE, /=$HTTP_CODE)"
+              
               if [ $i -lt $MAX_RETRIES ]; then
-                echo "Health check failed, retrying in ${RETRY_DELAY}s..."
+                echo "Retrying in ${RETRY_DELAY}s..."
                 sleep $RETRY_DELAY
+              else
+                echo "Showing recent container logs:"
+                docker logs --tail 50 api.minsol.kr 2>&1 || true
               fi
             done
             
             echo "✗ Health check failed after $MAX_RETRIES attempts"
-            echo "Container logs:"
-            docker logs --tail 30 api.minsol.kr || true
+            echo "Final container status:"
+            docker ps -a | grep api.minsol.kr || echo "Container not found"
+            echo ""
+            echo "Final container logs:"
+            docker logs --tail 100 api.minsol.kr 2>&1 || true
             exit 1
           EOF
