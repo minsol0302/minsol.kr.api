@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.jwt;
+package kr.minsol.api.services.oauthservice.jwt;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Encoders;

@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.jwt;
+package kr.minsol.api.services.oauthservice.jwt;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;

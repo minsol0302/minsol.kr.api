@@ -1,12 +1,9 @@
-package kr.minsol.api.oauthservice.google;
+package kr.minsol.api.services.oauthservice.google;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
-import kr.minsol.api.oauthservice.token.TokenService;
-import kr.minsol.api.oauthservice.jwt.JwtUtil;
-import kr.minsol.api.oauthservice.jwt.JwtTokenProvider;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +11,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import jakarta.servlet.http.HttpServletRequest;
+import kr.minsol.api.services.oauthservice.jwt.JwtTokenProvider;
+import kr.minsol.api.services.oauthservice.jwt.JwtUtil;
+import kr.minsol.api.services.oauthservice.token.TokenService;
 
 @RestController
 @RequestMapping({"/google", "/api/auth/google", "/oauth2/google"})

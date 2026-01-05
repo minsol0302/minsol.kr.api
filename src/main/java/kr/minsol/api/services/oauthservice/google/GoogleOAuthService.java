@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.google;
+package kr.minsol.api.services.oauthservice.google;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;

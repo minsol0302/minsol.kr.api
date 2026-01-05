@@ -2,7 +2,7 @@
 FROM eclipse-temurin:21-jdk AS api-builder
 WORKDIR /app
 # API Gateway 전체 디렉토리 복사
-COPY api.minsol.kr/ .
+COPY . .
 RUN chmod +x gradlew && ./gradlew build -x test
 
 # 최종 실행 이미지

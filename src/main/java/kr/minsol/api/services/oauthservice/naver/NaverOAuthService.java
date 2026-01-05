@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.naver;
+package kr.minsol.api.services.oauthservice.naver;
 
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;

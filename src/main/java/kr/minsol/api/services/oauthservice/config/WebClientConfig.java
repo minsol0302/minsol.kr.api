@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.config;
+package kr.minsol.api.services.oauthservice.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

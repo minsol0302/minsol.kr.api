@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.token;
+package kr.minsol.api.services.oauthservice.token;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.RedisTemplate;

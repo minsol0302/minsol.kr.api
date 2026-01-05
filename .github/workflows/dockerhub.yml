@@ -1,0 +1,164 @@
+name: Build & Push API Image to DockerHub & Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: minsol020302/api-minsol-kr
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          SPRING_PROFILES_ACTIVE: ${{ secrets.SPRING_PROFILES_ACTIVE || 'production' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SPRING_JPA_HIBERNATE_DDL_AUTO: ${{ secrets.SPRING_JPA_HIBERNATE_DDL_AUTO || 'none' }}
+          SPRING_JPA_SHOW_SQL: ${{ secrets.SPRING_JPA_SHOW_SQL || 'false' }}
+          UPSTASH_REDIS_HOST: ${{ secrets.UPSTASH_REDIS_HOST }}
+          UPSTASH_REDIS_PORT: ${{ secrets.UPSTASH_REDIS_PORT }}
+          UPSTASH_REDIS_PASSWORD: ${{ secrets.UPSTASH_REDIS_PASSWORD }}
+          SPRING_REDIS_SSL_ENABLED: ${{ secrets.SPRING_REDIS_SSL_ENABLED || 'true' }}
+          UPSTASH_REDIS_URL: ${{ secrets.UPSTASH_REDIS_URL }}
+          REDIS_ENABLED: ${{ secrets.REDIS_ENABLED || 'true' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_TOKEN_EXPIRATION: ${{ secrets.JWT_ACCESS_TOKEN_EXPIRATION }}
+          JWT_REFRESH_TOKEN_EXPIRATION: ${{ secrets.JWT_REFRESH_TOKEN_EXPIRATION }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          NAVER_REDIRECT_URI: ${{ secrets.NAVER_REDIRECT_URI }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+            # Login to DockerHub
+            echo "${DOCKERHUB_USERNAME}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+            
+            # Pull latest image
+            docker pull ${IMAGE_NAME}:latest
+            
+            # Stop and remove existing container
+            docker stop api.minsol.kr || true
+            docker rm api.minsol.kr || true
+            
+            # Run new container with environment variables
+            docker run -d \
+              --name api.minsol.kr \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -e SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
+              -e SPRING_DATASOURCE_URL="${DATABASE_URL}" \
+              -e SPRING_DATASOURCE_USERNAME="${DB_USER}" \
+              -e SPRING_DATASOURCE_PASSWORD="${DB_PASSWORD}" \
+              -e SPRING_JPA_HIBERNATE_DDL_AUTO="${SPRING_JPA_HIBERNATE_DDL_AUTO}" \
+              -e SPRING_JPA_SHOW_SQL="${SPRING_JPA_SHOW_SQL}" \
+              -e SPRING_REDIS_HOST="${UPSTASH_REDIS_HOST}" \
+              -e SPRING_REDIS_PORT="${UPSTASH_REDIS_PORT}" \
+              -e SPRING_REDIS_PASSWORD="${UPSTASH_REDIS_PASSWORD}" \
+              -e SPRING_REDIS_SSL_ENABLED="${SPRING_REDIS_SSL_ENABLED}" \
+              -e REDIS_HOST="${UPSTASH_REDIS_HOST}" \
+              -e REDIS_PORT="${UPSTASH_REDIS_PORT}" \
+              -e REDIS_PASSWORD="${UPSTASH_REDIS_PASSWORD}" \
+              -e REDIS_URL="${UPSTASH_REDIS_URL}" \
+              -e REDIS_ENABLED="${REDIS_ENABLED}" \
+              -e JWT_SECRET="${JWT_SECRET}" \
+              -e JWT_ACCESS_TOKEN_EXPIRATION="${JWT_ACCESS_TOKEN_EXPIRATION}" \
+              -e JWT_REFRESH_TOKEN_EXPIRATION="${JWT_REFRESH_TOKEN_EXPIRATION}" \
+              -e KAKAO_REST_API_KEY="${KAKAO_REST_API_KEY}" \
+              -e KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI}" \
+              -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}" \
+              -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}" \
+              -e GOOGLE_REDIRECT_URI="${GOOGLE_REDIRECT_URI}" \
+              -e NAVER_CLIENT_ID="${NAVER_CLIENT_ID}" \
+              -e NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET}" \
+              -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI}" \
+              ${IMAGE_NAME}:latest
+            
+            # Clean up old images
+            docker image prune -f
+          EOF
+
+      - name: Health Check
+        run: |
+          sleep 15
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "curl -f http://localhost:8080/actuator/health || exit 1"
+
+  deploy-to-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            IMAGE="${{ env.IMAGE_NAME }}:latest"
+            CONTAINER="minsol-api"
+
+            docker pull $IMAGE
+
+            # 기존 컨테이너 중지/삭제 (없어도 에러 안나게)
+            docker stop $CONTAINER || true
+            docker rm $CONTAINER || true
+
+            # 새 컨테이너 실행 (필요한 옵션은 프로젝트에 맞게 수정)
+            docker run -d --name $CONTAINER \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              $IMAGE
+
+            docker image prune -f

@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.config;
+package kr.minsol.api.services.oauthservice.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

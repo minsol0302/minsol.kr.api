@@ -1,4 +1,4 @@
-package kr.minsol.api.oauthservice.kakao;
+package kr.minsol.api.services.oauthservice.kakao;
 
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
