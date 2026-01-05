@@ -129,13 +129,67 @@ jobs:
               -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI}" \
               ${IMAGE_NAME}:latest
             
+            # Wait a bit and check container status
+            sleep 5
+            echo "Container status:"
+            docker ps -a | grep api.minsol.kr || echo "Container not found"
+            
             # Clean up old images
             docker image prune -f
           EOF
 
-      - name: Health Check
+      - name: Wait for application to start
         run: |
-          sleep 15
+          echo "Waiting for application to start..."
+          sleep 20
+
+      - name: Check container status
+        run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "curl -f http://localhost:8080/api/gateway/status || curl -f http://localhost:8080/actuator/health || exit 1"
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            echo "=== Container Status ==="
+            docker ps -a | grep api.minsol.kr || echo "Container not found"
+            echo ""
+            echo "=== Container Logs (last 50 lines) ==="
+            docker logs --tail 50 api.minsol.kr || echo "Cannot read logs"
+          EOF
+
+      - name: Health Check with retry
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            MAX_RETRIES=5
+            RETRY_DELAY=10
+            
+            for i in $(seq 1 $MAX_RETRIES); do
+              echo "Health check attempt $i/$MAX_RETRIES..."
+              
+              # Try /api/gateway/status first
+              if curl -f -s http://localhost:8080/api/gateway/status > /dev/null 2>&1; then
+                echo "✓ /api/gateway/status is healthy"
+                exit 0
+              fi
+              
+              # Try /actuator/health as fallback
+              if curl -f -s http://localhost:8080/actuator/health > /dev/null 2>&1; then
+                echo "✓ /actuator/health is healthy"
+                exit 0
+              fi
+              
+              # Try root path
+              if curl -f -s http://localhost:8080/ > /dev/null 2>&1; then
+                echo "✓ Root path is accessible"
+                exit 0
+              fi
+              
+              if [ $i -lt $MAX_RETRIES ]; then
+                echo "Health check failed, retrying in ${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+              fi
+            done
+            
+            echo "✗ Health check failed after $MAX_RETRIES attempts"
+            echo "Container logs:"
+            docker logs --tail 30 api.minsol.kr || true
+            exit 1
+          EOF
