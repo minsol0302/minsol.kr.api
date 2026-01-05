@@ -74,19 +74,27 @@ jobs:
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
           NAVER_REDIRECT_URI: ${{ secrets.NAVER_REDIRECT_URI }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
         run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
             # Login to DockerHub
-            echo "${DOCKERHUB_USERNAME}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
             
             # Pull latest image
             docker pull ${IMAGE_NAME}:latest
             
-            # Stop and remove existing container
-            docker stop api.minsol.kr || true
-            docker rm api.minsol.kr || true
+            # Stop and remove existing containers (check all possible names)
+            docker stop api.minsol.kr minsol-api || true
+            docker rm api.minsol.kr minsol-api || true
+            
+            # Check if port 8080 is in use and free it
+            CONTAINER_USING_PORT=$(docker ps -a --filter "publish=8080" --format "{{.ID}}" | head -n 1)
+            if [ ! -z "$CONTAINER_USING_PORT" ]; then
+              docker stop $CONTAINER_USING_PORT || true
+              docker rm $CONTAINER_USING_PORT || true
+            fi
             
             # Run new container with environment variables
             docker run -d \
@@ -130,35 +138,4 @@ jobs:
           sleep 15
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.EC2_SSH_PORT || 22 }} \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "curl -f http://localhost:8080/actuator/health || exit 1"
-
-  deploy-to-ec2:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: SSH Deploy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-
-            IMAGE="${{ env.IMAGE_NAME }}:latest"
-            CONTAINER="minsol-api"
-
-            docker pull $IMAGE
-
-            # 기존 컨테이너 중지/삭제 (없어도 에러 안나게)
-            docker stop $CONTAINER || true
-            docker rm $CONTAINER || true
-
-            # 새 컨테이너 실행 (필요한 옵션은 프로젝트에 맞게 수정)
-            docker run -d --name $CONTAINER \
-              --restart unless-stopped \
-              -p 8080:8080 \
-              $IMAGE
-
-            docker image prune -f
+            "curl -f http://localhost:8080/api/gateway/status || curl -f http://localhost:8080/actuator/health || exit 1"
