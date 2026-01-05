@@ -118,7 +118,13 @@ jobs:
               done
             fi
             
+            # Verify image exists
+            echo "=== Verifying image ==="
+            docker images | grep "${IMAGE_NAME}" || echo "Image not found!"
+            echo ""
+            
             # Run new container with environment variables
+            echo "=== Starting container ==="
             CONTAINER_ID=$(docker run -d \
               --name api.minsol.kr \
               --restart unless-stopped \
@@ -149,17 +155,49 @@ jobs:
               -e NAVER_CLIENT_ID="${NAVER_CLIENT_ID}" \
               -e NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET}" \
               -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI}" \
-              ${IMAGE_NAME}:latest)
+              ${IMAGE_NAME}:latest 2>&1)
             
-            echo "Container started with ID: $CONTAINER_ID"
+            echo "Container run output: $CONTAINER_ID"
+            
+            # Check if container was created successfully
+            if [ -z "$CONTAINER_ID" ] || echo "$CONTAINER_ID" | grep -q "Error"; then
+              echo "⚠️ Failed to start container!"
+              echo "Error: $CONTAINER_ID"
+              exit 1
+            fi
             
             # Wait a bit and check container status
-            sleep 5
-            echo "=== Container Status ==="
-            docker ps -a
+            sleep 3
             echo ""
-            echo "=== Initial Container Logs (api.minsol.kr) ==="
-            docker logs --tail 20 api.minsol.kr 2>&1 || echo "Cannot read logs for api.minsol.kr"
+            echo "=== Container Status (immediate check) ==="
+            docker ps -a | grep api.minsol.kr || echo "Container not found in ps output"
+            echo ""
+            
+            # Check container status
+            CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' api.minsol.kr 2>/dev/null || echo "not found")
+            echo "Container status: $CONTAINER_STATUS"
+            
+            if [ "$CONTAINER_STATUS" = "not found" ]; then
+              echo "⚠️ Container was not created!"
+              exit 1
+            fi
+            
+            if [ "$CONTAINER_STATUS" != "running" ]; then
+              echo "⚠️ Container is not running! Status: $CONTAINER_STATUS"
+              echo "Exit code: $(docker inspect -f '{{.State.ExitCode}}' api.minsol.kr 2>/dev/null || echo 'N/A')"
+              echo ""
+              echo "=== Container Logs ==="
+              docker logs api.minsol.kr 2>&1 || echo "Cannot read logs"
+              echo ""
+              echo "⚠️ Container failed to start. Check logs above."
+              # Don't exit 1 here, let it continue to see full logs
+            else
+              echo "✓ Container is running"
+            fi
+            
+            echo ""
+            echo "=== Initial Container Logs (last 30 lines) ==="
+            docker logs --tail 30 api.minsol.kr 2>&1 || echo "Cannot read logs for api.minsol.kr"
             
             # Clean up old images
             docker image prune -f
@@ -179,7 +217,12 @@ jobs:
             echo "=== Container Status (api.minsol.kr) ==="
             CONTAINER_EXISTS=$(docker ps -a --filter "name=api.minsol.kr" --format "{{.Names}}" 2>/dev/null || echo "")
             if [ -z "$CONTAINER_EXISTS" ]; then
-              echo "⚠️ Container 'api.minsol.kr' not found, checking for other containers..."
+              echo "⚠️ Container 'api.minsol.kr' not found!"
+              echo "Checking all containers..."
+              docker ps -a
+              echo ""
+              echo "Checking for containers using image ${IMAGE_NAME}..."
+              docker ps -a --filter "ancestor=${IMAGE_NAME}:latest" || echo "No containers found with this image"
               # Check for any container using port 8080
               CONTAINER_ON_PORT=$(docker ps -a --filter "publish=8080" --format "{{.Names}}" | head -n 1)
               if [ ! -z "$CONTAINER_ON_PORT" ]; then
@@ -196,23 +239,30 @@ jobs:
             echo "Using container name: $CONTAINER_NAME"
             echo ""
             
-            echo "=== Container Logs (last 100 lines) ==="
-            docker logs --tail 100 "$CONTAINER_NAME" 2>&1 || echo "Cannot read logs for $CONTAINER_NAME"
-            echo ""
+            # Check if container exists
+            if docker ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+              echo "=== Container Logs (last 100 lines) ==="
+              docker logs --tail 100 "$CONTAINER_NAME" 2>&1 || echo "Cannot read logs for $CONTAINER_NAME"
+              echo ""
+              
+              echo "=== Container Health ==="
+              CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "not found")
+              EXIT_CODE=$(docker inspect -f '{{.State.ExitCode}}' "$CONTAINER_NAME" 2>/dev/null || echo 'N/A')
+              echo "Container status: $CONTAINER_STATUS"
+              echo "Exit code: $EXIT_CODE"
+              
+              if [ "$CONTAINER_STATUS" != "running" ]; then
+                echo "⚠️ Container is not running!"
+                echo "Full container logs:"
+                docker logs "$CONTAINER_NAME" 2>&1 || true
+              fi
+            else
+              echo "⚠️ Container '$CONTAINER_NAME' does not exist!"
+            fi
             
+            echo ""
             echo "=== Port 8080 Status ==="
             netstat -tlnp 2>/dev/null | grep 8080 || ss -tlnp 2>/dev/null | grep 8080 || echo "Port 8080 not listening"
-            echo ""
-            
-            echo "=== Container Health ==="
-            CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "not found")
-            echo "Container status: $CONTAINER_STATUS"
-            
-            if [ "$CONTAINER_STATUS" != "running" ]; then
-              echo "⚠️ Container is not running!"
-              echo "Exit code: $(docker inspect -f '{{.State.ExitCode}}' "$CONTAINER_NAME" 2>/dev/null || echo 'N/A')"
-              # Don't exit 1 here, let health check handle it
-            fi
           EOF
 
       - name: Health Check with retry
@@ -225,22 +275,45 @@ jobs:
             # Find the actual container name
             CONTAINER_NAME=$(docker ps -a --filter "publish=8080" --format "{{.Names}}" | head -n 1)
             if [ -z "$CONTAINER_NAME" ]; then
-              CONTAINER_NAME="api.minsol.kr"
+              # Try to find by name
+              if docker ps -a --format "{{.Names}}" | grep -q "^api.minsol.kr$"; then
+                CONTAINER_NAME="api.minsol.kr"
+              elif docker ps -a --format "{{.Names}}" | grep -q "^api-minsol-kr$"; then
+                CONTAINER_NAME="api-minsol-kr"
+              else
+                CONTAINER_NAME="api.minsol.kr"
+              fi
             fi
             echo "Using container name: $CONTAINER_NAME"
             echo ""
+            
+            # Check if container exists at all
+            if ! docker ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+              echo "⚠️ Container '$CONTAINER_NAME' does not exist!"
+              echo "All containers:"
+              docker ps -a
+              echo ""
+              echo "Checking for containers using image ${IMAGE_NAME}..."
+              docker ps -a --filter "ancestor=${IMAGE_NAME}:latest" || echo "No containers found with this image"
+              exit 1
+            fi
             
             for i in $(seq 1 $MAX_RETRIES); do
               echo "Health check attempt $i/$MAX_RETRIES..."
               
               # Check if container is running
-              if ! docker ps --format "{{.Names}}" | grep -qE "(api\.minsol\.kr|api-minsol-kr|minsol-api|gateway)"; then
-                echo "⚠️ Container is not running!"
-                echo "All containers:"
-                docker ps -a
-                if [ $i -eq $MAX_RETRIES ]; then
+              CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "not found")
+              if [ "$CONTAINER_STATUS" != "running" ]; then
+                echo "⚠️ Container is not running! Status: $CONTAINER_STATUS"
+                if [ "$CONTAINER_STATUS" != "not found" ]; then
+                  EXIT_CODE=$(docker inspect -f '{{.State.ExitCode}}' "$CONTAINER_NAME" 2>/dev/null || echo 'N/A')
+                  echo "Exit code: $EXIT_CODE"
                   echo "Container logs:"
                   docker logs --tail 50 "$CONTAINER_NAME" 2>&1 || true
+                fi
+                if [ $i -eq $MAX_RETRIES ]; then
+                  echo "All containers:"
+                  docker ps -a
                   exit 1
                 fi
                 echo "Waiting for container to start..."
@@ -291,7 +364,7 @@ jobs:
                 sleep $RETRY_DELAY
               else
                 echo "Showing recent container logs:"
-                docker logs --tail 50 api.minsol.kr 2>&1 || true
+                docker logs --tail 50 "$CONTAINER_NAME" 2>&1 || true
               fi
             done
             
