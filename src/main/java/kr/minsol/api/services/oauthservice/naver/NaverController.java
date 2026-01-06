@@ -55,7 +55,37 @@ public class NaverController {
     }
 
     /**
-     * 네이버 인증 콜백 처리
+     * 네이버 인증 콜백 처리 (POST)
+     * 프론트엔드에서 POST 방식으로 code를 전달받아 처리
+     * Authorization Code를 받아서 바로 토큰 교환 및 JWT 생성 후 프론트엔드로 리다이렉트 URL 반환
+     */
+    @PostMapping("/callback")
+    public ResponseEntity<Map<String, Object>> naverCallbackPost(
+            @RequestBody(required = false) Map<String, Object> requestBody) {
+        
+        System.out.println("=== 네이버 콜백 POST 요청 수신 ===");
+        
+        String code = null;
+        String error = null;
+        String error_description = null;
+        
+        if (requestBody != null) {
+            code = requestBody.containsKey("code") ? requestBody.get("code").toString() : null;
+            error = requestBody.containsKey("error") ? requestBody.get("error").toString() : null;
+            error_description = requestBody.containsKey("error_description") ? requestBody.get("error_description").toString() : null;
+        }
+        
+        System.out.println("Code: " + code);
+        System.out.println("Error: " + error);
+        System.out.println("Error Description: " + error_description);
+        System.out.println("============================");
+        
+        return processNaverCallback(code, null, error, error_description);
+    }
+
+    /**
+     * 네이버 인증 콜백 처리 (GET)
+     * OAuth 제공자로부터 직접 리다이렉트되는 경우 처리
      * Authorization Code를 받아서 바로 토큰 교환 및 JWT 생성 후 프론트엔드로 리다이렉트
      */
     @GetMapping("/callback")
@@ -64,14 +94,14 @@ public class NaverController {
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
             @RequestParam(required = false) String error_description) {
-
-        System.out.println("=== 네이버 콜백 요청 수신 ===");
+        
+        System.out.println("=== 네이버 콜백 GET 요청 수신 ===");
         System.out.println("Code: " + code);
         System.out.println("State: " + state);
         System.out.println("Error: " + error);
         System.out.println("Error Description: " + error_description);
         System.out.println("============================");
-
+        
         // 프론트엔드 도메인 (환경 변수에서 가져오거나 기본값 사용)
         String frontendUrl = System.getenv("FRONTEND_URL");
         if (frontendUrl == null || frontendUrl.isEmpty()) {
@@ -80,73 +110,141 @@ public class NaverController {
 
         if (code != null) {
             try {
-                // 1. Authorization Code를 Access Token으로 교환
-                Map<String, Object> tokenResponse = naverOAuthService.getAccessToken(code, state);
-                String naverAccessToken = (String) tokenResponse.get("access_token");
-                String naverRefreshToken = (String) tokenResponse.get("refresh_token");
-                Object expiresIn = tokenResponse.get("expires_in"); // 초 단위
-
-                if (naverAccessToken == null) {
-                    throw new RuntimeException("네이버 Access Token을 받을 수 없습니다.");
+                // 공통 처리 로직 호출
+                ResponseEntity<Map<String, Object>> response = processNaverCallback(code, state, error, error_description);
+                
+                // ResponseEntity에서 redirectUrl 추출
+                Map<String, Object> responseBody = response.getBody();
+                if (responseBody != null && responseBody.containsKey("redirectUrl")) {
+                    Object redirectUrlObj = responseBody.get("redirectUrl");
+                    if (redirectUrlObj != null) {
+                        return new RedirectView(redirectUrlObj.toString());
+                    }
                 }
-
-                // 2. Access Token으로 사용자 정보 조회
-                Map<String, Object> userInfo = naverOAuthService.getUserInfo(naverAccessToken);
-                Map<String, Object> extractedUserInfo = naverOAuthService.extractUserInfo(userInfo);
-
-                // 3. 사용자 ID 추출
-                String userId = (String) extractedUserInfo.get("naver_id");
-
-                // 4. 네이버 OAuth 원본 토큰을 Redis에 저장
-                long naverTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 3600;
-                tokenService.saveOAuthAccessToken("naver", userId, naverAccessToken, naverTokenExpireTime);
-
-                if (naverRefreshToken != null) {
-                    // Refresh Token은 30일 유효 (네이버 기본값)
-                    tokenService.saveOAuthRefreshToken("naver", userId, naverRefreshToken, 2592000);
-                }
-
-                // 5. JWT 토큰 생성 (자체 JWT)
-                String jwtAccessToken = jwtTokenProvider.generateAccessToken(userId, "naver", extractedUserInfo);
-                String jwtRefreshToken = jwtTokenProvider.generateRefreshToken(userId, "naver");
-
-                // 6. JWT 토큰을 Redis에 저장
-                tokenService.saveAccessToken("naver", userId, jwtAccessToken, 3600);
-                tokenService.saveRefreshToken("naver", userId, jwtRefreshToken, 2592000);
-
-                // 7. 프론트엔드로 리다이렉트 (JWT 토큰 포함)
-                String redirectUrl = frontendUrl + "?token="
-                        + URLEncoder.encode(jwtAccessToken, StandardCharsets.UTF_8);
-                if (jwtRefreshToken != null) {
-                    redirectUrl += "&refresh_token=" + URLEncoder.encode(jwtRefreshToken, StandardCharsets.UTF_8);
-                }
-
-                System.out.println("JWT 토큰 생성 완료, 프론트엔드로 리다이렉트: " + redirectUrl);
+                
+                // redirectUrl이 없으면 기본 에러 처리
+                String redirectUrl = frontendUrl + "?error=" 
+                        + URLEncoder.encode("리다이렉트 URL을 생성할 수 없습니다.", StandardCharsets.UTF_8);
                 return new RedirectView(redirectUrl);
-
+                
             } catch (Exception e) {
                 System.err.println("네이버 인증 처리 중 오류 발생: " + e.getMessage());
                 e.printStackTrace();
-
-                // 에러 발생 시 프론트엔드로 리다이렉트
                 String redirectUrl = frontendUrl + "?error="
                         + URLEncoder.encode("인증 처리 중 오류가 발생했습니다.", StandardCharsets.UTF_8);
                 return new RedirectView(redirectUrl);
             }
         } else if (error != null) {
-            // 에러 시 프론트엔드로 리다이렉트 (에러 정보 포함)
             String redirectUrl = frontendUrl + "?error=" + URLEncoder.encode(error, StandardCharsets.UTF_8);
             if (error_description != null) {
                 redirectUrl += "&error_description=" + URLEncoder.encode(error_description, StandardCharsets.UTF_8);
             }
-
             System.out.println("에러 발생, 프론트엔드로 리다이렉트: " + redirectUrl);
             return new RedirectView(redirectUrl);
         } else {
-            // 인증 코드가 없는 경우
             String redirectUrl = frontendUrl + "?error=" + URLEncoder.encode("인증 코드가 없습니다.", StandardCharsets.UTF_8);
             System.out.println("인증 코드 없음, 프론트엔드로 리다이렉트: " + redirectUrl);
             return new RedirectView(redirectUrl);
+        }
+    }
+    
+    /**
+     * 네이버 콜백 공통 처리 로직
+     */
+    private ResponseEntity<Map<String, Object>> processNaverCallback(
+            String code, String state, String error, String error_description) {
+        
+        // 프론트엔드 도메인 (환경 변수에서 가져오거나 기본값 사용)
+        String frontendUrl = System.getenv("FRONTEND_URL");
+        if (frontendUrl == null || frontendUrl.isEmpty()) {
+            frontendUrl = "http://localhost:3000";
+        }
+        
+        Map<String, Object> response = new HashMap<>();
+
+        if (error != null) {
+            // 에러 발생
+            response.put("success", false);
+            response.put("error", error);
+            response.put("error_description", error_description);
+            response.put("redirectUrl", frontendUrl + "?error=" + URLEncoder.encode(error, StandardCharsets.UTF_8));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        if (code == null) {
+            // 인증 코드가 없는 경우
+            response.put("success", false);
+            response.put("message", "인증 코드가 없습니다.");
+            response.put("redirectUrl", frontendUrl + "?error=" + URLEncoder.encode("인증 코드가 없습니다.", StandardCharsets.UTF_8));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        try {
+            // 1. Authorization Code를 Access Token으로 교환
+            Map<String, Object> tokenResponse = naverOAuthService.getAccessToken(code, state);
+            String naverAccessToken = (String) tokenResponse.get("access_token");
+            String naverRefreshToken = (String) tokenResponse.get("refresh_token");
+            Object expiresIn = tokenResponse.get("expires_in"); // 초 단위
+
+            if (naverAccessToken == null) {
+                throw new RuntimeException("네이버 Access Token을 받을 수 없습니다.");
+            }
+
+            // 2. Access Token으로 사용자 정보 조회
+            Map<String, Object> userInfo = naverOAuthService.getUserInfo(naverAccessToken);
+            Map<String, Object> extractedUserInfo = naverOAuthService.extractUserInfo(userInfo);
+
+            // 3. 사용자 ID 추출
+            String userId = (String) extractedUserInfo.get("naver_id");
+
+            // 4. 네이버 OAuth 원본 토큰을 Redis에 저장
+            long naverTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 3600;
+            tokenService.saveOAuthAccessToken("naver", userId, naverAccessToken, naverTokenExpireTime);
+
+            if (naverRefreshToken != null) {
+                // Refresh Token은 30일 유효 (네이버 기본값)
+                tokenService.saveOAuthRefreshToken("naver", userId, naverRefreshToken, 2592000);
+            }
+
+            // 5. JWT 토큰 생성 (자체 JWT)
+            String jwtAccessToken = jwtTokenProvider.generateAccessToken(userId, "naver", extractedUserInfo);
+            String jwtRefreshToken = jwtTokenProvider.generateRefreshToken(userId, "naver");
+
+            // 6. JWT 토큰을 Redis에 저장
+            tokenService.saveAccessToken("naver", userId, jwtAccessToken, 3600);
+            tokenService.saveRefreshToken("naver", userId, jwtRefreshToken, 2592000);
+
+            // 7. 프론트엔드로 리다이렉트 URL 생성 (JWT 토큰 포함)
+            String redirectUrl = frontendUrl + "/dashboard/naver?token="
+                    + URLEncoder.encode(jwtAccessToken, StandardCharsets.UTF_8);
+            if (jwtRefreshToken != null) {
+                redirectUrl += "&refresh_token=" + URLEncoder.encode(jwtRefreshToken, StandardCharsets.UTF_8);
+            }
+
+            System.out.println("JWT 토큰 생성 완료, 프론트엔드로 리다이렉트: " + redirectUrl);
+
+            response.put("success", true);
+            response.put("message", "네이버 로그인 성공");
+            response.put("token", jwtAccessToken);
+            response.put("refresh_token", jwtRefreshToken);
+            response.put("redirectUrl", redirectUrl);
+
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+
+        } catch (Exception e) {
+            System.err.println("네이버 인증 처리 중 오류 발생: " + e.getMessage());
+            e.printStackTrace();
+
+            // 에러 발생 시 프론트엔드로 리다이렉트
+            String redirectUrl = frontendUrl + "?error="
+                    + URLEncoder.encode("인증 처리 중 오류가 발생했습니다.", StandardCharsets.UTF_8);
+
+            response.put("success", false);
+            response.put("error", "인증 처리 중 오류가 발생했습니다.");
+            response.put("message", e.getMessage());
+            response.put("redirectUrl", redirectUrl);
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
