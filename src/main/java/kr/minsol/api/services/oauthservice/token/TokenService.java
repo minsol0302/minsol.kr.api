@@ -33,9 +33,14 @@ public class TokenService {
     public void saveAccessToken(String provider, String userId, String accessToken, long expireTime) {
         Optional<RedisTemplate<String, Object>> redisTemplate = getRedisTemplate();
         if (redisTemplate.isPresent()) {
-            String key = String.format("token:%s:%s:access", provider, userId);
-            redisTemplate.get().opsForValue().set(key, accessToken, expireTime, TimeUnit.SECONDS);
-            System.out.println("Redis 저장 - Key: " + key + ", TTL: " + expireTime + "초");
+            try {
+                String key = String.format("token:%s:%s:access", provider, userId);
+                redisTemplate.get().opsForValue().set(key, accessToken, expireTime, TimeUnit.SECONDS);
+                System.out.println("Redis 저장 - Key: " + key + ", TTL: " + expireTime + "초");
+            } catch (Exception e) {
+                System.err.println("⚠️ Redis 저장 실패 (계속 진행): Access Token 저장 중 오류 - " + e.getMessage());
+                // Redis 저장 실패해도 로그인은 계속 진행
+            }
         } else {
             System.out.println("⚠️ Redis가 비활성화되어 있습니다. 토큰 저장이 건너뜁니다.");
         }
@@ -52,9 +57,14 @@ public class TokenService {
     public void saveRefreshToken(String provider, String userId, String refreshToken, long expireTime) {
         Optional<RedisTemplate<String, Object>> redisTemplate = getRedisTemplate();
         if (redisTemplate.isPresent()) {
-            String key = String.format("token:%s:%s:refresh", provider, userId);
-            redisTemplate.get().opsForValue().set(key, refreshToken, expireTime, TimeUnit.SECONDS);
-            System.out.println("Redis 저장 - Key: " + key + ", TTL: " + expireTime + "초");
+            try {
+                String key = String.format("token:%s:%s:refresh", provider, userId);
+                redisTemplate.get().opsForValue().set(key, refreshToken, expireTime, TimeUnit.SECONDS);
+                System.out.println("Redis 저장 - Key: " + key + ", TTL: " + expireTime + "초");
+            } catch (Exception e) {
+                System.err.println("⚠️ Redis 저장 실패 (계속 진행): Refresh Token 저장 중 오류 - " + e.getMessage());
+                // Redis 저장 실패해도 로그인은 계속 진행
+            }
         } else {
             System.out.println("⚠️ Redis가 비활성화되어 있습니다. 토큰 저장이 건너뜁니다.");
         }
@@ -156,9 +166,14 @@ public class TokenService {
     public void saveOAuthAccessToken(String provider, String userId, String accessToken, long expireTime) {
         Optional<RedisTemplate<String, Object>> redisTemplate = getRedisTemplate();
         if (redisTemplate.isPresent()) {
-            String key = String.format("oauth:%s:%s:access", provider, userId);
-            redisTemplate.get().opsForValue().set(key, accessToken, expireTime, TimeUnit.SECONDS);
-            System.out.println("Redis 저장 - OAuth Access Token - Key: " + key + ", TTL: " + expireTime + "초");
+            try {
+                String key = String.format("oauth:%s:%s:access", provider, userId);
+                redisTemplate.get().opsForValue().set(key, accessToken, expireTime, TimeUnit.SECONDS);
+                System.out.println("Redis 저장 - OAuth Access Token - Key: " + key + ", TTL: " + expireTime + "초");
+            } catch (Exception e) {
+                System.err.println("⚠️ Redis 저장 실패 (계속 진행): OAuth Access Token 저장 중 오류 - " + e.getMessage());
+                // Redis 저장 실패해도 로그인은 계속 진행
+            }
         } else {
             System.out.println("⚠️ Redis가 비활성화되어 있습니다. OAuth 토큰 저장이 건너뜁니다.");
         }
@@ -175,9 +190,14 @@ public class TokenService {
     public void saveOAuthRefreshToken(String provider, String userId, String refreshToken, long expireTime) {
         Optional<RedisTemplate<String, Object>> redisTemplate = getRedisTemplate();
         if (redisTemplate.isPresent()) {
-            String key = String.format("oauth:%s:%s:refresh", provider, userId);
-            redisTemplate.get().opsForValue().set(key, refreshToken, expireTime, TimeUnit.SECONDS);
-            System.out.println("Redis 저장 - OAuth Refresh Token - Key: " + key + ", TTL: " + expireTime + "초");
+            try {
+                String key = String.format("oauth:%s:%s:refresh", provider, userId);
+                redisTemplate.get().opsForValue().set(key, refreshToken, expireTime, TimeUnit.SECONDS);
+                System.out.println("Redis 저장 - OAuth Refresh Token - Key: " + key + ", TTL: " + expireTime + "초");
+            } catch (Exception e) {
+                System.err.println("⚠️ Redis 저장 실패 (계속 진행): OAuth Refresh Token 저장 중 오류 - " + e.getMessage());
+                // Redis 저장 실패해도 로그인은 계속 진행
+            }
         } else {
             System.out.println("⚠️ Redis가 비활성화되어 있습니다. OAuth 토큰 저장이 건너뜁니다.");
         }
