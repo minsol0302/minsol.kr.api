@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
-
+// 로그확인용 주석 추가
 @RestController
 @RequestMapping("/api/gateway")
 public class GatewayController {
