@@ -97,11 +97,13 @@ public class NaverController {
         System.out.println("=== 네이버 콜백 POST 요청 수신 ===");
 
         String code = null;
+        String state = null;
         String error = null;
         String error_description = null;
 
         if (requestBody != null) {
             code = requestBody.containsKey("code") ? requestBody.get("code").toString() : null;
+            state = requestBody.containsKey("state") ? requestBody.get("state").toString() : null;
             error = requestBody.containsKey("error") ? requestBody.get("error").toString() : null;
             error_description = requestBody.containsKey("error_description")
                     ? requestBody.get("error_description").toString()
@@ -109,11 +111,12 @@ public class NaverController {
         }
 
         System.out.println("Code: " + code);
+        System.out.println("State: " + state);
         System.out.println("Error: " + error);
         System.out.println("Error Description: " + error_description);
         System.out.println("============================");
 
-        return processNaverCallback(code, null, error, error_description);
+        return processNaverCallback(code, state, error, error_description);
     }
 
     /**
