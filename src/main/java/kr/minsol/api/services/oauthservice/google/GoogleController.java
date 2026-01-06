@@ -36,8 +36,9 @@ public class GoogleController {
      * 구글 인증 URL 제공
      * 프론트엔드에서 CLIENT ID를 노출하지 않고 인증 URL을 가져올 수 있도록 함
      */
-    @GetMapping("/auth-url")
-    public ResponseEntity<Map<String, Object>> getGoogleAuthUrl() {
+    @PostMapping("/auth-url")
+    public ResponseEntity<Map<String, Object>> getGoogleAuthUrl(
+            @RequestBody(required = false) Map<String, Object> request) {
         // 환경 변수에서 가져오기
         String clientId = System.getenv("GOOGLE_CLIENT_ID");
         String redirectUri = System.getenv("GOOGLE_REDIRECT_URI");
