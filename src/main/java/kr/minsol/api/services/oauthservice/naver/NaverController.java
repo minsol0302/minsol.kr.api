@@ -171,29 +171,24 @@ public class NaverController {
                     }
                 }
 
-                // redirectUrl이 없으면 기본 에러 처리
-                String redirectUrl = frontendUrl + "?error="
-                        + URLEncoder.encode("리다이렉트 URL을 생성할 수 없습니다.", StandardCharsets.UTF_8);
-                return new RedirectView(redirectUrl);
+                // redirectUrl이 없으면 기본 에러 처리 - URL에 에러 파라미터 포함하지 않음
+                System.err.println("[Naver Callback GET] 리다이렉트 URL을 생성할 수 없습니다.");
+                return new RedirectView(frontendUrl);
 
             } catch (Exception e) {
-                System.err.println("네이버 인증 처리 중 오류 발생: " + e.getMessage());
+                System.err.println("[Naver Callback GET] 네이버 인증 처리 중 오류 발생: " + e.getMessage());
                 e.printStackTrace();
-                String redirectUrl = frontendUrl + "?error="
-                        + URLEncoder.encode("인증 처리 중 오류가 발생했습니다.", StandardCharsets.UTF_8);
-                return new RedirectView(redirectUrl);
+                // URL에 에러 파라미터 포함하지 않음
+                return new RedirectView(frontendUrl);
             }
         } else if (error != null) {
-            String redirectUrl = frontendUrl + "?error=" + URLEncoder.encode(error, StandardCharsets.UTF_8);
-            if (error_description != null) {
-                redirectUrl += "&error_description=" + URLEncoder.encode(error_description, StandardCharsets.UTF_8);
-            }
-            System.out.println("에러 발생, 프론트엔드로 리다이렉트: " + redirectUrl);
-            return new RedirectView(redirectUrl);
+            // OAuth 에러 - URL에 에러 파라미터 포함하지 않음
+            System.err.println("[Naver Callback GET] OAuth 에러: " + error);
+            return new RedirectView(frontendUrl);
         } else {
-            String redirectUrl = frontendUrl + "?error=" + URLEncoder.encode("인증 코드가 없습니다.", StandardCharsets.UTF_8);
-            System.out.println("인증 코드 없음, 프론트엔드로 리다이렉트: " + redirectUrl);
-            return new RedirectView(redirectUrl);
+            // 인증 코드 없음 - URL에 에러 파라미터 포함하지 않음
+            System.err.println("[Naver Callback GET] 인증 코드가 없습니다.");
+            return new RedirectView(frontendUrl);
         }
     }
 
@@ -227,20 +222,21 @@ public class NaverController {
         Map<String, Object> response = new HashMap<>();
 
         if (error != null) {
-            // 에러 발생
+            // 에러 발생 - URL에 에러 파라미터 포함하지 않음
             response.put("success", false);
             response.put("error", error);
             response.put("error_description", error_description);
-            response.put("redirectUrl", frontendUrl + "?error=" + URLEncoder.encode(error, StandardCharsets.UTF_8));
+            response.put("redirectUrl", frontendUrl);
+            System.err.println("[Naver Callback] OAuth 에러 발생: " + error);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
 
         if (code == null) {
-            // 인증 코드가 없는 경우
+            // 인증 코드가 없는 경우 - URL에 에러 파라미터 포함하지 않음
             response.put("success", false);
             response.put("message", "인증 코드가 없습니다.");
-            response.put("redirectUrl",
-                    frontendUrl + "?error=" + URLEncoder.encode("인증 코드가 없습니다.", StandardCharsets.UTF_8));
+            response.put("redirectUrl", frontendUrl);
+            System.err.println("[Naver Callback] 인증 코드가 없습니다.");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
 
@@ -297,17 +293,14 @@ public class NaverController {
             return ResponseEntity.status(HttpStatus.OK).body(response);
 
         } catch (Exception e) {
-            System.err.println("네이버 인증 처리 중 오류 발생: " + e.getMessage());
+            System.err.println("[Naver Callback] 네이버 인증 처리 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
 
-            // 에러 발생 시 프론트엔드로 리다이렉트
-            String redirectUrl = frontendUrl + "?error="
-                    + URLEncoder.encode("인증 처리 중 오류가 발생했습니다.", StandardCharsets.UTF_8);
-
+            // 에러 발생 시 - URL에 에러 파라미터 포함하지 않음
             response.put("success", false);
             response.put("error", "인증 처리 중 오류가 발생했습니다.");
             response.put("message", e.getMessage());
-            response.put("redirectUrl", redirectUrl);
+            response.put("redirectUrl", frontendUrl);
 
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }

@@ -43,7 +43,7 @@ public class KakaoController {
             // 환경 변수에서 가져오기
             String clientId = System.getenv("KAKAO_REST_API_KEY");
             String redirectUri = System.getenv("KAKAO_REDIRECT_URI");
-            
+
             // 환경 변수 검증
             if (clientId == null || clientId.isEmpty()) {
                 System.err.println("[Kakao Auth-URL] 오류: KAKAO_REST_API_KEY 환경 변수가 설정되지 않았습니다.");
@@ -52,7 +52,7 @@ public class KakaoController {
                         "error", "KAKAO_REST_API_KEY 환경 변수가 설정되지 않았습니다.",
                         "message", "서버 설정 오류: Kakao REST API Key가 없습니다."));
             }
-            
+
             if (redirectUri == null || redirectUri.isEmpty()) {
                 System.err.println("[Kakao Auth-URL] 오류: KAKAO_REDIRECT_URI 환경 변수가 설정되지 않았습니다.");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
@@ -60,7 +60,7 @@ public class KakaoController {
                         "error", "KAKAO_REDIRECT_URI 환경 변수가 설정되지 않았습니다.",
                         "message", "서버 설정 오류: Kakao Redirect URI가 없습니다."));
             }
-            
+
             String state = UUID.randomUUID().toString(); // CSRF 방지용 state
 
             String authUrl = String.format(
@@ -69,9 +69,10 @@ public class KakaoController {
                     URLEncoder.encode(redirectUri, StandardCharsets.UTF_8),
                     state);
 
-            System.out.println("[Kakao Auth-URL] 생성 완료: " + authUrl.substring(0, Math.min(authUrl.length(), 100)) + "...");
+            System.out.println(
+                    "[Kakao Auth-URL] 생성 완료: " + authUrl.substring(0, Math.min(authUrl.length(), 100)) + "...");
             System.out.println("[Kakao Auth-URL] Redirect URI 확인: " + redirectUri);
-            
+
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "auth_url", authUrl));
@@ -142,10 +143,10 @@ public class KakaoController {
             String environment = System.getenv("SPRING_PROFILES_ACTIVE");
             String railwayEnv = System.getenv("RAILWAY_ENVIRONMENT");
             String awsRegion = System.getenv("AWS_REGION");
-            
-            if ((environment != null && (environment.contains("prod") || environment.contains("production"))) 
-                || railwayEnv != null 
-                || awsRegion != null) {
+
+            if ((environment != null && (environment.contains("prod") || environment.contains("production")))
+                    || railwayEnv != null
+                    || awsRegion != null) {
                 frontendUrl = "https://www.minsol.kr";
             } else {
                 frontendUrl = "http://localhost:3000";
@@ -171,29 +172,24 @@ public class KakaoController {
                     }
                 }
 
-                // redirectUrl이 없으면 기본 에러 처리
-                String redirectUrl = frontendUrl + "?error="
-                        + URLEncoder.encode("리다이렉트 URL을 생성할 수 없습니다.", StandardCharsets.UTF_8);
-                return new RedirectView(redirectUrl);
+                // redirectUrl이 없으면 기본 에러 처리 - URL에 에러 파라미터 포함하지 않음
+                System.err.println("[Kakao Callback GET] 리다이렉트 URL을 생성할 수 없습니다.");
+                return new RedirectView(frontendUrl);
 
             } catch (Exception e) {
-                System.err.println("카카오 인증 처리 중 오류 발생: " + e.getMessage());
+                System.err.println("[Kakao Callback GET] 카카오 인증 처리 중 오류 발생: " + e.getMessage());
                 e.printStackTrace();
-                String redirectUrl = frontendUrl + "?error="
-                        + URLEncoder.encode("인증 처리 중 오류가 발생했습니다.", StandardCharsets.UTF_8);
-                return new RedirectView(redirectUrl);
+                // URL에 에러 파라미터 포함하지 않음
+                return new RedirectView(frontendUrl);
             }
         } else if (error != null) {
-            String redirectUrl = frontendUrl + "?error=" + URLEncoder.encode(error, StandardCharsets.UTF_8);
-            if (error_description != null) {
-                redirectUrl += "&error_description=" + URLEncoder.encode(error_description, StandardCharsets.UTF_8);
-            }
-            System.out.println("에러 발생, 프론트엔드로 리다이렉트: " + redirectUrl);
-            return new RedirectView(redirectUrl);
+            // OAuth 에러 - URL에 에러 파라미터 포함하지 않음
+            System.err.println("[Kakao Callback GET] OAuth 에러: " + error);
+            return new RedirectView(frontendUrl);
         } else {
-            String redirectUrl = frontendUrl + "?error=" + URLEncoder.encode("인증 코드가 없습니다.", StandardCharsets.UTF_8);
-            System.out.println("인증 코드 없음, 프론트엔드로 리다이렉트: " + redirectUrl);
-            return new RedirectView(redirectUrl);
+            // 인증 코드 없음 - URL에 에러 파라미터 포함하지 않음
+            System.err.println("[Kakao Callback GET] 인증 코드가 없습니다.");
+            return new RedirectView(frontendUrl);
         }
     }
 
@@ -202,7 +198,7 @@ public class KakaoController {
      */
     private ResponseEntity<Map<String, Object>> processKakaoCallback(
             String code, String state, String error, String error_description) {
-        
+
         // 프론트엔드 도메인 (환경 변수에서 가져오거나 기본값 사용)
         String frontendUrl = System.getenv("FRONTEND_URL");
         if (frontendUrl == null || frontendUrl.isEmpty()) {
@@ -210,10 +206,10 @@ public class KakaoController {
             String environment = System.getenv("SPRING_PROFILES_ACTIVE");
             String railwayEnv = System.getenv("RAILWAY_ENVIRONMENT");
             String awsRegion = System.getenv("AWS_REGION");
-            
-            if ((environment != null && (environment.contains("prod") || environment.contains("production"))) 
-                || railwayEnv != null 
-                || awsRegion != null) {
+
+            if ((environment != null && (environment.contains("prod") || environment.contains("production")))
+                    || railwayEnv != null
+                    || awsRegion != null) {
                 frontendUrl = "https://www.minsol.kr";
             } else {
                 frontendUrl = "http://localhost:3000";
@@ -223,23 +219,25 @@ public class KakaoController {
         if (!frontendUrl.startsWith("http://") && !frontendUrl.startsWith("https://")) {
             frontendUrl = "https://" + frontendUrl;
         }
-        
+
         Map<String, Object> response = new HashMap<>();
 
         if (error != null) {
-            // 에러 발생
+            // 에러 발생 - URL에 에러 파라미터 포함하지 않음
             response.put("success", false);
             response.put("error", error);
             response.put("error_description", error_description);
-            response.put("redirectUrl", frontendUrl + "?error=" + URLEncoder.encode(error, StandardCharsets.UTF_8));
+            response.put("redirectUrl", frontendUrl);
+            System.err.println("[Kakao Callback] OAuth 에러 발생: " + error);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
 
         if (code == null) {
-            // 인증 코드가 없는 경우
+            // 인증 코드가 없는 경우 - URL에 에러 파라미터 포함하지 않음
             response.put("success", false);
             response.put("message", "인증 코드가 없습니다.");
-            response.put("redirectUrl", frontendUrl + "?error=" + URLEncoder.encode("인증 코드가 없습니다.", StandardCharsets.UTF_8));
+            response.put("redirectUrl", frontendUrl);
+            System.err.println("[Kakao Callback] 인증 코드가 없습니다.");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
 
@@ -300,17 +298,14 @@ public class KakaoController {
             return ResponseEntity.status(HttpStatus.OK).body(response);
 
         } catch (Exception e) {
-            System.err.println("카카오 인증 처리 중 오류 발생: " + e.getMessage());
+            System.err.println("[Kakao Callback] 카카오 인증 처리 중 오류 발생: " + e.getMessage());
             e.printStackTrace();
 
-            // 에러 발생 시 프론트엔드로 리다이렉트
-            String redirectUrl = frontendUrl + "?error="
-                    + URLEncoder.encode("인증 처리 중 오류가 발생했습니다.", StandardCharsets.UTF_8);
-
+            // 에러 발생 시 - URL에 에러 파라미터 포함하지 않음
             response.put("success", false);
             response.put("error", "인증 처리 중 오류가 발생했습니다.");
             response.put("message", e.getMessage());
-            response.put("redirectUrl", redirectUrl);
+            response.put("redirectUrl", frontendUrl);
 
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
