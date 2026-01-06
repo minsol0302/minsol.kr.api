@@ -39,20 +39,50 @@ public class GoogleController {
     @PostMapping("/auth-url")
     public ResponseEntity<Map<String, Object>> getGoogleAuthUrl(
             @RequestBody(required = false) Map<String, Object> request) {
-        // 환경 변수에서 가져오기
-        String clientId = System.getenv("GOOGLE_CLIENT_ID");
-        String redirectUri = System.getenv("GOOGLE_REDIRECT_URI");
-        String state = UUID.randomUUID().toString(); // CSRF 방지용 state
+        try {
+            // 환경 변수에서 가져오기
+            String clientId = System.getenv("GOOGLE_CLIENT_ID");
+            String redirectUri = System.getenv("GOOGLE_REDIRECT_URI");
 
-        String authUrl = String.format(
-                "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=%s&redirect_uri=%s&scope=openid%%20profile%%20email&state=%s",
-                clientId,
-                URLEncoder.encode(redirectUri, StandardCharsets.UTF_8),
-                state);
+            // 환경 변수 검증
+            if (clientId == null || clientId.isEmpty()) {
+                System.err.println("[Google Auth-URL] 오류: GOOGLE_CLIENT_ID 환경 변수가 설정되지 않았습니다.");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                        "success", false,
+                        "error", "GOOGLE_CLIENT_ID 환경 변수가 설정되지 않았습니다.",
+                        "message", "서버 설정 오류: Google Client ID가 없습니다."));
+            }
 
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "auth_url", authUrl));
+            if (redirectUri == null || redirectUri.isEmpty()) {
+                System.err.println("[Google Auth-URL] 오류: GOOGLE_REDIRECT_URI 환경 변수가 설정되지 않았습니다.");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                        "success", false,
+                        "error", "GOOGLE_REDIRECT_URI 환경 변수가 설정되지 않았습니다.",
+                        "message", "서버 설정 오류: Google Redirect URI가 없습니다."));
+            }
+
+            String state = UUID.randomUUID().toString(); // CSRF 방지용 state
+
+            String authUrl = String.format(
+                    "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=%s&redirect_uri=%s&scope=openid%%20profile%%20email&state=%s",
+                    clientId,
+                    URLEncoder.encode(redirectUri, StandardCharsets.UTF_8),
+                    state);
+
+            System.out.println(
+                    "[Google Auth-URL] 생성 완료: " + authUrl.substring(0, Math.min(authUrl.length(), 100)) + "...");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "auth_url", authUrl));
+        } catch (Exception e) {
+            System.err.println("[Google Auth-URL] 예외 발생: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "error", "인증 URL 생성 중 오류 발생",
+                    "message", e.getMessage()));
+        }
     }
 
     /**
