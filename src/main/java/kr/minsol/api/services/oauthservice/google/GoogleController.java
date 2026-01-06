@@ -108,13 +108,22 @@ public class GoogleController {
         // 프론트엔드 도메인 (환경 변수에서 가져오거나 기본값 사용)
         String frontendUrl = System.getenv("FRONTEND_URL");
         if (frontendUrl == null || frontendUrl.isEmpty()) {
-            // 프로덕션 환경에서는 www.minsol.kr 사용, 로컬 개발 시에만 localhost
+            // 프로덕션 환경 감지: Railway, AWS, 또는 프로덕션 프로파일
             String environment = System.getenv("SPRING_PROFILES_ACTIVE");
-            if (environment != null && environment.contains("prod")) {
+            String railwayEnv = System.getenv("RAILWAY_ENVIRONMENT");
+            String awsRegion = System.getenv("AWS_REGION");
+
+            if ((environment != null && (environment.contains("prod") || environment.contains("production")))
+                    || railwayEnv != null
+                    || awsRegion != null) {
                 frontendUrl = "https://www.minsol.kr";
             } else {
                 frontendUrl = "http://localhost:3000";
             }
+        }
+        // 프로토콜이 없으면 https:// 추가
+        if (!frontendUrl.startsWith("http://") && !frontendUrl.startsWith("https://")) {
+            frontendUrl = "https://" + frontendUrl;
         }
 
         if (code != null) {
@@ -167,13 +176,22 @@ public class GoogleController {
         // 프론트엔드 도메인 (환경 변수에서 가져오거나 기본값 사용)
         String frontendUrl = System.getenv("FRONTEND_URL");
         if (frontendUrl == null || frontendUrl.isEmpty()) {
-            // 프로덕션 환경에서는 www.minsol.kr 사용, 로컬 개발 시에만 localhost
+            // 프로덕션 환경 감지: Railway, AWS, 또는 프로덕션 프로파일
             String environment = System.getenv("SPRING_PROFILES_ACTIVE");
-            if (environment != null && environment.contains("prod")) {
+            String railwayEnv = System.getenv("RAILWAY_ENVIRONMENT");
+            String awsRegion = System.getenv("AWS_REGION");
+
+            if ((environment != null && (environment.contains("prod") || environment.contains("production")))
+                    || railwayEnv != null
+                    || awsRegion != null) {
                 frontendUrl = "https://www.minsol.kr";
             } else {
                 frontendUrl = "http://localhost:3000";
             }
+        }
+        // 프로토콜이 없으면 https:// 추가
+        if (!frontendUrl.startsWith("http://") && !frontendUrl.startsWith("https://")) {
+            frontendUrl = "https://" + frontendUrl;
         }
 
         Map<String, Object> response = new HashMap<>();
