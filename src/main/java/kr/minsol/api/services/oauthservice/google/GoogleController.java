@@ -108,7 +108,13 @@ public class GoogleController {
         // 프론트엔드 도메인 (환경 변수에서 가져오거나 기본값 사용)
         String frontendUrl = System.getenv("FRONTEND_URL");
         if (frontendUrl == null || frontendUrl.isEmpty()) {
-            frontendUrl = "http://localhost:3000";
+            // 프로덕션 환경에서는 www.minsol.kr 사용, 로컬 개발 시에만 localhost
+            String environment = System.getenv("SPRING_PROFILES_ACTIVE");
+            if (environment != null && environment.contains("prod")) {
+                frontendUrl = "https://www.minsol.kr";
+            } else {
+                frontendUrl = "http://localhost:3000";
+            }
         }
 
         if (code != null) {
@@ -161,7 +167,13 @@ public class GoogleController {
         // 프론트엔드 도메인 (환경 변수에서 가져오거나 기본값 사용)
         String frontendUrl = System.getenv("FRONTEND_URL");
         if (frontendUrl == null || frontendUrl.isEmpty()) {
-            frontendUrl = "http://localhost:3000";
+            // 프로덕션 환경에서는 www.minsol.kr 사용, 로컬 개발 시에만 localhost
+            String environment = System.getenv("SPRING_PROFILES_ACTIVE");
+            if (environment != null && environment.contains("prod")) {
+                frontendUrl = "https://www.minsol.kr";
+            } else {
+                frontendUrl = "http://localhost:3000";
+            }
         }
 
         Map<String, Object> response = new HashMap<>();
