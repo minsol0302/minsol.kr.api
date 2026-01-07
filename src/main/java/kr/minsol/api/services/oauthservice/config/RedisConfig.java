@@ -1,6 +1,7 @@
 package kr.minsol.api.services.oauthservice.config;
 
 import io.lettuce.core.ClientOptions;
+import io.lettuce.core.RedisURI;
 import io.lettuce.core.SocketOptions;
 import io.lettuce.core.SslOptions;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
@@ -20,12 +21,15 @@ import java.time.Duration;
 
 /**
  * Redis 설정
- * 로컬 Redis와 Google Cloud Memorystore Redis를 모두 지원합니다.
+ * Upstash Redis를 rediss:// URL 방식으로 연결합니다.
  * Redis가 없어도 애플리케이션이 시작되도록 선택적으로 설정됩니다.
  */
 @Configuration
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = false)
 public class RedisConfig {
+
+    @Value("${spring.data.redis.url:}")
+    private String redisUrl;
 
     @Value("${spring.data.redis.host:localhost}")
     private String redisHost;
@@ -40,79 +44,75 @@ public class RedisConfig {
     private boolean sslEnabled;
 
     /**
-     * 호스트에서 포트 제거 및 정리
-     * 환경 변수에 "host:port" 형식으로 들어온 경우 분리
-     */
-    private void parseHostAndPort() {
-        if (redisHost != null && redisHost.contains(":")) {
-            // 호스트에 포트가 포함된 경우 분리
-            String[] parts = redisHost.split(":");
-            redisHost = parts[0];
-            if (parts.length > 1) {
-                try {
-                    redisPort = Integer.parseInt(parts[1]);
-                    System.out.println("Redis 호스트/포트 분리: 호스트=" + redisHost + ", 포트=" + redisPort);
-                } catch (NumberFormatException e) {
-                    System.err.println("⚠️ Redis 포트 파싱 실패: " + parts[1] + ", 기본값 6379 사용");
-                }
-            }
-        }
-    }
-
-    /**
      * RedisConnectionFactory 빈 생성
+     * Upstash Redis는 rediss:// URL 형식을 사용합니다.
      */
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         try {
-            // 호스트와 포트 분리
-            parseHostAndPort();
-            
             RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-            config.setHostName(redisHost);
-            config.setPort(redisPort);
-            if (redisPassword != null && !redisPassword.isEmpty()) {
-                config.setPassword(redisPassword);
+            boolean useSsl = false;
+
+            // 1순위: REDIS_URL 환경 변수 사용 (rediss:// 형식)
+            if (redisUrl != null && !redisUrl.isEmpty()) {
+                System.out.println("Redis URL 사용: " + redisUrl.replaceAll(":([^:@]+)@", ":****@"));
+                RedisURI redisURI = RedisURI.create(redisUrl);
+
+                // RedisURI에서 정보 추출
+                config.setHostName(redisURI.getHost());
+                config.setPort(redisURI.getPort());
+                if (redisURI.getPassword() != null && redisURI.getPassword().length > 0) {
+                    config.setPassword(new String(redisURI.getPassword()));
+                }
+                useSsl = redisURI.isSsl();
+                System.out.println("✅ Redis URI 파싱 완료 - Host: " + redisURI.getHost() + ", Port: " + redisURI.getPort()
+                        + ", SSL: " + useSsl);
+            } else {
+                // 2순위: REDIS_HOST, REDIS_PORT, REDIS_PASSWORD 조합
+                config.setHostName(redisHost);
+                config.setPort(redisPort);
+                if (redisPassword != null && !redisPassword.isEmpty()) {
+                    config.setPassword(redisPassword);
+                }
+                useSsl = sslEnabled;
+                System.out.println("Redis 호스트/포트 사용: " + redisHost + ":" + redisPort + ", SSL: " + useSsl);
             }
-            
-            LettuceClientConfiguration.LettuceClientConfigurationBuilder clientConfigBuilder = 
-                LettuceClientConfiguration.builder()
+
+            // LettuceClientConfiguration 빌더
+            LettuceClientConfiguration.LettuceClientConfigurationBuilder clientConfigBuilder = LettuceClientConfiguration
+                    .builder()
                     .commandTimeout(Duration.ofSeconds(10))
                     .shutdownTimeout(Duration.ofMillis(100));
-            
-            // SSL 설정
-            if (sslEnabled) {
-                System.out.println("Redis SSL 연결 시도: " + redisHost + ":" + redisPort);
+
+            // SSL 설정 (Upstash Redis용)
+            if (useSsl) {
                 try {
-                    // Upstash Redis SSL 설정
                     SslOptions sslOptions = SslOptions.builder()
-                        .jdkSslProvider()
-                        .trustManager(InsecureTrustManagerFactory.INSTANCE) // Upstash는 자체 서명 인증서 사용
-                        .build();
-                    
+                            .jdkSslProvider()
+                            .trustManager(InsecureTrustManagerFactory.INSTANCE) // Upstash는 자체 서명 인증서 사용
+                            .build();
+
                     SocketOptions socketOptions = SocketOptions.builder()
-                        .connectTimeout(Duration.ofSeconds(10))
-                        .keepAlive(true)
-                        .build();
-                    
+                            .connectTimeout(Duration.ofSeconds(10))
+                            .keepAlive(true)
+                            .build();
+
                     ClientOptions clientOptions = ClientOptions.builder()
-                        .socketOptions(socketOptions)
-                        .sslOptions(sslOptions)
-                        .build();
-                    
+                            .socketOptions(socketOptions)
+                            .sslOptions(sslOptions)
+                            .build();
+
                     clientConfigBuilder.clientOptions(clientOptions);
-                    System.out.println("Redis SSL 설정 완료");
+                    System.out.println("✅ Redis SSL 설정 완료");
                 } catch (Exception e) {
                     System.err.println("⚠️ Redis SSL 설정 실패: " + e.getMessage());
                     e.printStackTrace();
-                    throw new RuntimeException("Redis SSL 설정 실패", e);
                 }
-            } else {
-                System.out.println("Redis 일반 연결 시도: " + redisHost + ":" + redisPort);
             }
-            
+
             LettuceConnectionFactory factory = new LettuceConnectionFactory(config, clientConfigBuilder.build());
             factory.afterPropertiesSet();
+            System.out.println("✅ Redis ConnectionFactory 생성 완료");
             return factory;
         } catch (Exception e) {
             System.err.println("⚠️ Redis ConnectionFactory 생성 실패: " + e.getMessage());

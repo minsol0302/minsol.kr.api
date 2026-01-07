@@ -263,22 +263,22 @@ public class KakaoController {
             }
             String userId = kakaoIdObj.toString();
 
-            // 4. 카카오 OAuth 원본 토큰을 Redis에 저장
-            long kakaoTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 21600;
-            tokenService.saveOAuthAccessToken("kakao", userId, kakaoAccessToken, kakaoTokenExpireTime);
-
-            if (kakaoRefreshToken != null) {
-                // Refresh Token은 60일 유효 (카카오 기본값)
-                tokenService.saveOAuthRefreshToken("kakao", userId, kakaoRefreshToken, 5184000);
-            }
-
-            // 5. JWT 토큰 생성 (자체 JWT)
+            // 4. JWT 토큰 생성 (자체 JWT)
             String jwtAccessToken = jwtTokenProvider.generateAccessToken(userId, "kakao", extractedUserInfo);
             String jwtRefreshToken = jwtTokenProvider.generateRefreshToken(userId, "kakao");
 
-            // 6. JWT 토큰을 Redis에 저장
-            tokenService.saveAccessToken("kakao", userId, jwtAccessToken, 3600);
-            tokenService.saveRefreshToken("kakao", userId, jwtRefreshToken, 2592000);
+            // 5. 모든 토큰을 Redis와 Neon에 저장 (통합 저장)
+            long kakaoTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 21600;
+            long jwtAccessExpireTime = 3600; // 1시간 (초)
+            long jwtRefreshExpireTime = 2592000; // 30일 (초)
+            // 카카오 Refresh Token은 60일(5184000초)이지만, saveAllTokens에서는 OAuth Access Token 만료 시간을 사용
+            
+            tokenService.saveAllTokens(
+                "kakao", userId,
+                kakaoAccessToken, kakaoRefreshToken,
+                jwtAccessToken, jwtRefreshToken,
+                kakaoTokenExpireTime, jwtAccessExpireTime, jwtRefreshExpireTime
+            );
 
             // 7. 프론트엔드로 리다이렉트 URL 생성 (JWT 토큰 포함)
             String redirectUrl = frontendUrl + "/dashboard/kakao?token="

@@ -258,22 +258,21 @@ public class GoogleController {
             // 3. 사용자 ID 추출
             String userId = (String) extractedUserInfo.get("google_id");
 
-            // 4. 구글 OAuth 원본 토큰을 Redis에 저장
-            long googleTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 3600;
-            tokenService.saveOAuthAccessToken("google", userId, googleAccessToken, googleTokenExpireTime);
-
-            if (googleRefreshToken != null) {
-                // Refresh Token은 30일 유효 (구글 기본값)
-                tokenService.saveOAuthRefreshToken("google", userId, googleRefreshToken, 2592000);
-            }
-
-            // 5. JWT 토큰 생성 (자체 JWT)
+            // 4. JWT 토큰 생성 (자체 JWT)
             String jwtAccessToken = jwtTokenProvider.generateAccessToken(userId, "google", extractedUserInfo);
             String jwtRefreshToken = jwtTokenProvider.generateRefreshToken(userId, "google");
 
-            // 6. JWT 토큰을 Redis에 저장
-            tokenService.saveAccessToken("google", userId, jwtAccessToken, 3600);
-            tokenService.saveRefreshToken("google", userId, jwtRefreshToken, 2592000);
+            // 5. 모든 토큰을 Redis와 Neon에 저장 (통합 저장)
+            long googleTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 3600;
+            long jwtAccessExpireTime = 3600; // 1시간 (초)
+            long jwtRefreshExpireTime = 2592000; // 30일 (초)
+            
+            tokenService.saveAllTokens(
+                "google", userId,
+                googleAccessToken, googleRefreshToken,
+                jwtAccessToken, jwtRefreshToken,
+                googleTokenExpireTime, jwtAccessExpireTime, jwtRefreshExpireTime
+            );
 
             // 7. 프론트엔드로 리다이렉트 URL 생성 (JWT 토큰 포함)
             String redirectUrl = frontendUrl + "/dashboard/google?token="
