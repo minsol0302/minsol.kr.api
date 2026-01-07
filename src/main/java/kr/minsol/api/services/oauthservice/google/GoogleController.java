@@ -16,7 +16,7 @@ import kr.minsol.api.services.oauthservice.jwt.JwtUtil;
 import kr.minsol.api.services.oauthservice.token.TokenService;
 
 @RestController
-@RequestMapping({ "/google", "/api/auth/google", "/oauth2/google", "/api/google" })
+@RequestMapping("/api/auth/google")
 public class GoogleController {
 
     private final TokenService tokenService;
@@ -266,13 +266,12 @@ public class GoogleController {
             long googleTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 3600;
             long jwtAccessExpireTime = 3600; // 1시간 (초)
             long jwtRefreshExpireTime = 2592000; // 30일 (초)
-            
+
             tokenService.saveAllTokens(
-                "google", userId,
-                googleAccessToken, googleRefreshToken,
-                jwtAccessToken, jwtRefreshToken,
-                googleTokenExpireTime, jwtAccessExpireTime, jwtRefreshExpireTime
-            );
+                    "google", userId,
+                    googleAccessToken, googleRefreshToken,
+                    jwtAccessToken, jwtRefreshToken,
+                    googleTokenExpireTime, jwtAccessExpireTime, jwtRefreshExpireTime);
 
             // 7. 프론트엔드로 리다이렉트 URL 생성 (JWT 토큰 포함)
             String redirectUrl = frontendUrl + "/dashboard/google?token="

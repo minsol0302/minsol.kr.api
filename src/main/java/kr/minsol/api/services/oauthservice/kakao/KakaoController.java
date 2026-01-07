@@ -16,7 +16,7 @@ import kr.minsol.api.services.oauthservice.jwt.JwtUtil;
 import kr.minsol.api.services.oauthservice.token.TokenService;
 
 @RestController
-@RequestMapping({ "/kakao", "/api/auth/kakao", "/oauth2/kakao", "/api/kakao" })
+@RequestMapping("/api/auth/kakao")
 public class KakaoController {
 
     private final TokenService tokenService;
@@ -271,14 +271,14 @@ public class KakaoController {
             long kakaoTokenExpireTime = expiresIn != null ? Long.parseLong(expiresIn.toString()) : 21600;
             long jwtAccessExpireTime = 3600; // 1시간 (초)
             long jwtRefreshExpireTime = 2592000; // 30일 (초)
-            // 카카오 Refresh Token은 60일(5184000초)이지만, saveAllTokens에서는 OAuth Access Token 만료 시간을 사용
-            
+            // 카카오 Refresh Token은 60일(5184000초)이지만, saveAllTokens에서는 OAuth Access Token 만료
+            // 시간을 사용
+
             tokenService.saveAllTokens(
-                "kakao", userId,
-                kakaoAccessToken, kakaoRefreshToken,
-                jwtAccessToken, jwtRefreshToken,
-                kakaoTokenExpireTime, jwtAccessExpireTime, jwtRefreshExpireTime
-            );
+                    "kakao", userId,
+                    kakaoAccessToken, kakaoRefreshToken,
+                    jwtAccessToken, jwtRefreshToken,
+                    kakaoTokenExpireTime, jwtAccessExpireTime, jwtRefreshExpireTime);
 
             // 7. 프론트엔드로 리다이렉트 URL 생성 (JWT 토큰 포함)
             String redirectUrl = frontendUrl + "/dashboard/kakao?token="
