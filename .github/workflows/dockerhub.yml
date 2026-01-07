@@ -166,9 +166,10 @@ jobs:
               --restart unless-stopped \
               -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE="${{ secrets.SPRING_PROFILES_ACTIVE || 'production' }}" \
-              -e SPRING_DATASOURCE_URL="${{ secrets.DATABASE_URL }}" \
-              -e SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USER }}" \
-              -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              -e SPRING_DATASOURCE_URL="${{ secrets.SPRING_DATASOURCE_URL || secrets.DATABASE_URL }}" \
+              -e SPRING_DATASOURCE_USERNAME="${{ secrets.SPRING_DATASOURCE_USERNAME || secrets.DB_USER }}" \
+              -e SPRING_DATASOURCE_PASSWORD="${{ secrets.SPRING_DATASOURCE_PASSWORD || secrets.DB_PASSWORD }}" \
+              -e SPRING_DATASOURCE_DRIVER_CLASS_NAME="${{ secrets.SPRING_DATASOURCE_DRIVER_CLASS_NAME || 'org.postgresql.Driver' }}" \
               -e SPRING_JPA_HIBERNATE_DDL_AUTO="${{ secrets.SPRING_JPA_HIBERNATE_DDL_AUTO || 'none' }}" \
               -e SPRING_JPA_SHOW_SQL="${{ secrets.SPRING_JPA_SHOW_SQL || 'false' }}" \
               -e SPRING_REDIS_HOST="${{ secrets.UPSTASH_REDIS_HOST }}" \

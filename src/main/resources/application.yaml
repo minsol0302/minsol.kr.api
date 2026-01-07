@@ -1,13 +1,13 @@
 spring:
   application:
-    name: gatewaycat .env
+    name: gateway
   config:
     import: "optional:configserver:"
   
   # PostgreSQL 데이터베이스 설정 (Neon PostgreSQL)
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mydb}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
     hikari:
@@ -17,7 +17,7 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
   
-  # JPA 설정
+  # JPA 설정 (데이터소스가 있을 때만 활성화)
   jpa:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:none}
@@ -28,6 +28,7 @@ spring:
         format_sql: true
         use_sql_comments: true
     open-in-view: false
+    database-platform: ${SPRING_JPA_DATABASE_PLATFORM:}
   
   # Redis 설정 (로컬 개발용 - 선택적, Redis가 없어도 애플리케이션은 시작됨)
   # OAuth Service와 공통 사용
