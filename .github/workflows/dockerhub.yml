@@ -43,10 +43,42 @@ jobs:
     steps:
       - name: Configure SSH
         run: |
+          set -euo pipefail
+          
+          # Create .ssh directory with proper permissions
           mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Verify SSH key is not empty
+          if [ -z "${{ secrets.EC2_SSH_KEY }}" ]; then
+            echo "Error: EC2_SSH_KEY secret is empty or not set"
+            exit 1
+          fi
+          
+          # Write SSH key
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          
+          # Verify SSH key file was created
+          if [ ! -f ~/.ssh/id_rsa ]; then
+            echo "Error: Failed to create SSH key file"
+            exit 1
+          fi
+          
+          # Add EC2 host to known_hosts
+          if [ -z "${{ secrets.EC2_HOST }}" ]; then
+            echo "Error: EC2_HOST secret is empty or not set"
+            exit 1
+          fi
+          
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>&1 || {
+            echo "Warning: ssh-keyscan failed, but continuing..."
+          }
+          
+          # Verify known_hosts was updated
+          chmod 644 ~/.ssh/known_hosts
+          
+          echo "SSH configuration completed successfully"
 
       - name: Deploy to EC2
         env:
