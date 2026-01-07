@@ -374,23 +374,23 @@ jobs:
               fi
               
               # Try /api/gateway/status first
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/gateway/status 2>/dev/null || echo "000")
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" api.minsol.kr/api/gateway/status 2>/dev/null || echo "000")
               if [ "$HTTP_CODE" = "200" ]; then
                 echo "✓ /api/gateway/status is healthy (HTTP $HTTP_CODE)"
-                curl -s http://localhost:8080/api/gateway/status | head -c 200
+                curl -s api.minsol.kr/api/gateway/status | head -c 200
                 echo ""
                 exit 0
               fi
               
               # Try /actuator/health as fallback
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || echo "000")
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" api.minsol.kr/actuator/health 2>/dev/null || echo "000")
               if [ "$HTTP_CODE" = "200" ]; then
                 echo "✓ /actuator/health is healthy (HTTP $HTTP_CODE)"
                 exit 0
               fi
               
               # Try root path
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null || echo "000")
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" api.minsol.kr/ 2>/dev/null || echo "000")
               if [ "$HTTP_CODE" != "000" ] && [ "$HTTP_CODE" != "404" ]; then
                 echo "✓ Root path is accessible (HTTP $HTTP_CODE)"
                 exit 0

@@ -67,7 +67,7 @@ kakao:
 google:
   client-id: ${GOOGLE_CLIENT_ID:}
   client-secret: ${GOOGLE_CLIENT_SECRET:}
-  redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/google/callback}
+  redirect-uri: ${GOOGLE_REDIRECT_URI:api.minsol.kr/google/callback}
 
 naver:
   client-id: ${NAVER_CLIENT_ID:}
