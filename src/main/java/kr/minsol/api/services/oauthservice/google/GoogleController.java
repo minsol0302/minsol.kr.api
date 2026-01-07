@@ -16,7 +16,7 @@ import kr.minsol.api.services.oauthservice.jwt.JwtUtil;
 import kr.minsol.api.services.oauthservice.token.TokenService;
 
 @RestController
-@RequestMapping({ "/google", "/api/auth/google", "/oauth2/google" })
+@RequestMapping({ "/google", "/api/auth/google", "/oauth2/google", "/api/google" })
 public class GoogleController {
 
     private final TokenService tokenService;

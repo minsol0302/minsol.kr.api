@@ -16,7 +16,7 @@ import kr.minsol.api.services.oauthservice.jwt.JwtUtil;
 import kr.minsol.api.services.oauthservice.token.TokenService;
 
 @RestController
-@RequestMapping({ "/naver", "/api/auth/naver", "/oauth2/naver" })
+@RequestMapping({ "/naver", "/api/auth/naver", "/oauth2/naver", "/api/naver" })
 public class NaverController {
 
     private final TokenService tokenService;

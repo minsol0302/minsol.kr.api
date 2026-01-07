@@ -16,7 +16,7 @@ import kr.minsol.api.services.oauthservice.jwt.JwtUtil;
 import kr.minsol.api.services.oauthservice.token.TokenService;
 
 @RestController
-@RequestMapping({ "/kakao", "/api/auth/kakao", "/oauth2/kakao" })
+@RequestMapping({ "/kakao", "/api/auth/kakao", "/oauth2/kakao", "/api/kakao" })
 public class KakaoController {
 
     private final TokenService tokenService;
