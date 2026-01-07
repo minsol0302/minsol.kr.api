@@ -89,7 +89,7 @@ public class GoogleController {
      * 구글 인증 콜백 처리 (POST)
      * 프론트엔드에서 POST 방식으로 code를 전달받아 처리
      * Authorization Code를 받아서 바로 토큰 교환 및 JWT 생성 후 프론트엔드로 리다이렉트 URL 반환
-     * 커밋을 위한 더미
+     * 커밋을 위한 더미 두번쨰쨰
      */
     @PostMapping("/callback")
     public ResponseEntity<Map<String, Object>> googleCallbackPost(
