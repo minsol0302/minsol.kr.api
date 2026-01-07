@@ -12,6 +12,7 @@ import java.util.Map;
 /**
  * 구글 OAuth2 인증 서비스
  * 구글 API와 통신하여 토큰 교환 및 사용자 정보 조회
+ * 재배포 테스트트
  */
 @Service
 public class GoogleOAuthService {
