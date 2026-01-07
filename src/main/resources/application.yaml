@@ -5,6 +5,7 @@ spring:
     import: "optional:configserver:"
   
   # PostgreSQL 데이터베이스 설정 (Neon PostgreSQL)
+  # 환경 변수가 없으면 애플리케이션 시작 실패
   datasource:
     url: ${SPRING_DATASOURCE_URL:}
     username: ${SPRING_DATASOURCE_USERNAME:}

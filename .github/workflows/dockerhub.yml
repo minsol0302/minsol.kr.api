@@ -161,12 +161,23 @@ jobs:
             
             # Run new container with environment variables
             echo "=== Starting container ==="
+            echo "Checking environment variables..."
+            echo "SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL && 'SET' || 'NOT SET' }}"
+            echo "DATABASE_URL: ${{ secrets.DATABASE_URL && 'SET' || 'NOT SET' }}"
+            
+            # DATABASE_URL이 jdbc:로 시작하지 않으면 jdbc: 추가
+            DATASOURCE_URL="${{ secrets.SPRING_DATASOURCE_URL || secrets.DATABASE_URL }}"
+            if [ ! -z "$DATASOURCE_URL" ] && [[ ! "$DATASOURCE_URL" =~ ^jdbc: ]]; then
+              echo "Converting DATABASE_URL to JDBC format..."
+              DATASOURCE_URL="jdbc:postgresql://${DATASOURCE_URL#*://}"
+            fi
+            
             CONTAINER_ID=$(docker run -d \
               --name api.minsol.kr \
               --restart unless-stopped \
               -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE="${{ secrets.SPRING_PROFILES_ACTIVE || 'production' }}" \
-              -e SPRING_DATASOURCE_URL="${{ secrets.SPRING_DATASOURCE_URL || secrets.DATABASE_URL }}" \
+              -e SPRING_DATASOURCE_URL="${DATASOURCE_URL}" \
               -e SPRING_DATASOURCE_USERNAME="${{ secrets.SPRING_DATASOURCE_USERNAME || secrets.DB_USER }}" \
               -e SPRING_DATASOURCE_PASSWORD="${{ secrets.SPRING_DATASOURCE_PASSWORD || secrets.DB_PASSWORD }}" \
               -e SPRING_DATASOURCE_DRIVER_CLASS_NAME="${{ secrets.SPRING_DATASOURCE_DRIVER_CLASS_NAME || 'org.postgresql.Driver' }}" \
