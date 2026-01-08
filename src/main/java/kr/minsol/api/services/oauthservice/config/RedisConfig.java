@@ -81,8 +81,8 @@ public class RedisConfig {
             // LettuceClientConfiguration 빌더
             LettuceClientConfiguration.LettuceClientConfigurationBuilder clientConfigBuilder = LettuceClientConfiguration
                     .builder()
-                    .commandTimeout(Duration.ofSeconds(10))
-                    .shutdownTimeout(Duration.ofMillis(100));
+                    .commandTimeout(Duration.ofSeconds(30)) // 타임아웃 증가
+                    .shutdownTimeout(Duration.ofSeconds(5)); // 종료 타임아웃 증가
 
             // SSL 설정 (Upstash Redis용)
             if (useSsl) {
@@ -93,8 +93,9 @@ public class RedisConfig {
                             .build();
 
                     SocketOptions socketOptions = SocketOptions.builder()
-                            .connectTimeout(Duration.ofSeconds(10))
+                            .connectTimeout(Duration.ofSeconds(30)) // 연결 타임아웃 증가
                             .keepAlive(true)
+                            .tcpNoDelay(true) // TCP NoDelay 활성화
                             .build();
 
                     ClientOptions clientOptions = ClientOptions.builder()
