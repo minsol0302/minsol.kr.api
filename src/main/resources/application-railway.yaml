@@ -150,6 +150,31 @@ server:
   port: 8080
 
 # ============================================================================
+# SpringDoc OpenAPI (Swagger) 설정
+# ============================================================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /docs
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    use-root-path: false
+    persist-authorization: true
+    urls:
+      - name: Gateway APIs
+        url: /v3/api-docs
+      - name: Transformer Service
+        url: /koelectra/openapi.json
+      - name: ML Service
+        url: /api/mlservice/openapi.json
+  show-actuator: false
+  default-flat-param-object: true
+  writer-with-order-by-keys: true
+
+# ============================================================================
 # OAuth Service 설정 (core.minsol.kr/oauthservice 통합)
 # ============================================================================
 oauth:
