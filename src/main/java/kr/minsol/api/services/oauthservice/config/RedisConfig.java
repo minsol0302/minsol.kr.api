@@ -1,9 +1,5 @@
 package kr.minsol.api.services.oauthservice.config;
 
-import io.lettuce.core.ClientOptions;
-import io.lettuce.core.SocketOptions;
-import io.lettuce.core.SslOptions;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -49,9 +45,8 @@ public class RedisConfig {
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         try {
+            // RedisStandaloneConfiguration 설정
             RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-
-            // Upstash Redis 설정 (ACL 기반 - username 필수)
             config.setHostName(redisHost);
             config.setPort(redisPort);
             config.setUsername(redisUsername); // ⭐ 핵심: Upstash는 username 필수
@@ -63,44 +58,21 @@ public class RedisConfig {
                     + ", Username: " + redisUsername + ", SSL: " + sslEnabled
                     + ", Password: " + (redisPassword != null && !redisPassword.isEmpty() ? "***설정됨***" : "없음"));
 
-            // LettuceClientConfiguration 빌더
+            // LettuceClientConfiguration 빌더 (간단한 방식)
             LettuceClientConfiguration.LettuceClientConfigurationBuilder clientConfigBuilder = LettuceClientConfiguration
                     .builder()
-                    .commandTimeout(Duration.ofSeconds(10))
-                    .shutdownTimeout(Duration.ZERO);
+                    .commandTimeout(Duration.ofSeconds(5));
 
             // SSL 설정 (Upstash Redis용 - 필수)
             if (sslEnabled) {
-                try {
-                    SslOptions sslOptions = SslOptions.builder()
-                            .jdkSslProvider()
-                            .trustManager(InsecureTrustManagerFactory.INSTANCE) // Upstash는 자체 서명 인증서 사용
-                            .build();
-
-                    SocketOptions socketOptions = SocketOptions.builder()
-                            .connectTimeout(Duration.ofSeconds(10))
-                            .keepAlive(true)
-                            .tcpNoDelay(true)
-                            .build();
-
-                    ClientOptions clientOptions = ClientOptions.builder()
-                            .socketOptions(socketOptions)
-                            .sslOptions(sslOptions)
-                            .build();
-
-                    // ⭐ 핵심: clientOptions를 먼저 설정한 후 useSsl() 호출
-                    clientConfigBuilder.clientOptions(clientOptions);
-                    clientConfigBuilder.useSsl(); // SSL 활성화
-
-                    System.out.println("✅ Redis SSL 설정 완료 (useSsl 활성화)");
-                } catch (Exception e) {
-                    System.err.println("⚠️ Redis SSL 설정 실패: " + e.getMessage());
-                    e.printStackTrace();
-                }
+                clientConfigBuilder.useSsl(); // ⭐ 핵심: useSsl()만 호출하면 됨
+                System.out.println("✅ Redis SSL 설정 완료 (useSsl 활성화)");
             }
 
-            LettuceConnectionFactory factory = new LettuceConnectionFactory(config, clientConfigBuilder.build());
+            LettuceClientConfiguration clientConfig = clientConfigBuilder.build();
+            LettuceConnectionFactory factory = new LettuceConnectionFactory(config, clientConfig);
             factory.afterPropertiesSet();
+
             System.out.println("✅ Redis ConnectionFactory 생성 완료");
             return factory;
         } catch (Exception e) {
