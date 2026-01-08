@@ -1,7 +1,6 @@
 package kr.minsol.api.services.oauthservice.config;
 
 import io.lettuce.core.ClientOptions;
-import io.lettuce.core.RedisURI;
 import io.lettuce.core.SocketOptions;
 import io.lettuce.core.SslOptions;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
@@ -21,21 +20,21 @@ import java.time.Duration;
 
 /**
  * Redis 설정
- * Upstash Redis를 rediss:// URL 방식으로 연결합니다.
+ * Upstash Redis 연결 (ACL 기반 - username 필수)
  * Redis가 없어도 애플리케이션이 시작되도록 선택적으로 설정됩니다.
  */
 @Configuration
 @ConditionalOnProperty(name = "spring.data.redis.enabled", havingValue = "true", matchIfMissing = false)
 public class RedisConfig {
 
-    @Value("${spring.data.redis.url:}")
-    private String redisUrl;
-
     @Value("${spring.data.redis.host:localhost}")
     private String redisHost;
 
     @Value("${spring.data.redis.port:6379}")
     private int redisPort;
+
+    @Value("${spring.data.redis.username:default}")
+    private String redisUsername;
 
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
@@ -45,47 +44,32 @@ public class RedisConfig {
 
     /**
      * RedisConnectionFactory 빈 생성
-     * Upstash Redis는 rediss:// URL 형식을 사용합니다.
+     * Upstash Redis는 ACL 기반이므로 username=default를 필수로 설정합니다.
      */
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         try {
             RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-            boolean useSsl = false;
-
-            // 1순위: REDIS_URL 환경 변수 사용 (rediss:// 형식)
-            if (redisUrl != null && !redisUrl.isEmpty()) {
-                System.out.println("Redis URL 사용: " + redisUrl.replaceAll(":([^:@]+)@", ":****@"));
-                RedisURI redisURI = RedisURI.create(redisUrl);
-
-                // RedisURI에서 정보 추출
-                config.setHostName(redisURI.getHost());
-                config.setPort(redisURI.getPort());
-                if (redisURI.getPassword() != null && redisURI.getPassword().length > 0) {
-                    config.setPassword(new String(redisURI.getPassword()));
-                }
-                useSsl = redisURI.isSsl();
-                System.out.println("✅ Redis URI 파싱 완료 - Host: " + redisURI.getHost() + ", Port: " + redisURI.getPort()
-                        + ", SSL: " + useSsl);
-            } else {
-                // 2순위: REDIS_HOST, REDIS_PORT, REDIS_PASSWORD 조합
-                config.setHostName(redisHost);
-                config.setPort(redisPort);
-                if (redisPassword != null && !redisPassword.isEmpty()) {
-                    config.setPassword(redisPassword);
-                }
-                useSsl = sslEnabled;
-                System.out.println("Redis 호스트/포트 사용: " + redisHost + ":" + redisPort + ", SSL: " + useSsl);
+            
+            // Upstash Redis 설정 (ACL 기반 - username 필수)
+            config.setHostName(redisHost);
+            config.setPort(redisPort);
+            config.setUsername(redisUsername); // ⭐ 핵심: Upstash는 username 필수
+            if (redisPassword != null && !redisPassword.isEmpty()) {
+                config.setPassword(redisPassword);
             }
+            
+            System.out.println("✅ Redis 설정 완료 - Host: " + redisHost + ", Port: " + redisPort 
+                    + ", Username: " + redisUsername + ", SSL: " + sslEnabled);
 
             // LettuceClientConfiguration 빌더
             LettuceClientConfiguration.LettuceClientConfigurationBuilder clientConfigBuilder = LettuceClientConfiguration
                     .builder()
-                    .commandTimeout(Duration.ofSeconds(30)) // 타임아웃 증가
-                    .shutdownTimeout(Duration.ofSeconds(5)); // 종료 타임아웃 증가
+                    .commandTimeout(Duration.ofSeconds(5))
+                    .shutdownTimeout(Duration.ZERO);
 
-            // SSL 설정 (Upstash Redis용)
-            if (useSsl) {
+            // SSL 설정 (Upstash Redis용 - 필수)
+            if (sslEnabled) {
                 try {
                     SslOptions sslOptions = SslOptions.builder()
                             .jdkSslProvider()
@@ -93,9 +77,8 @@ public class RedisConfig {
                             .build();
 
                     SocketOptions socketOptions = SocketOptions.builder()
-                            .connectTimeout(Duration.ofSeconds(30)) // 연결 타임아웃 증가
+                            .connectTimeout(Duration.ofSeconds(5))
                             .keepAlive(true)
-                            .tcpNoDelay(true) // TCP NoDelay 활성화
                             .build();
 
                     ClientOptions clientOptions = ClientOptions.builder()
