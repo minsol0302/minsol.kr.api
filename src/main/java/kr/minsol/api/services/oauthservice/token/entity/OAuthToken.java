@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "oauth_tokens", indexes = {
-    @Index(name = "idx_provider_user", columnList = "provider,userId"),
-    @Index(name = "idx_expires_at", columnList = "expiresAt")
+    @Index(name = "idx_provider_user", columnList = "provider,user_id"),
+    @Index(name = "idx_expires_at", columnList = "expires_at")
 })
 public class OAuthToken {
     
@@ -17,37 +17,37 @@ public class OAuthToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(nullable = false, length = 50)
+    @Column(name = "provider", nullable = false, length = 50)
     private String provider; // google, kakao, naver
     
-    @Column(nullable = false, length = 255)
+    @Column(name = "user_id", nullable = false, length = 255)
     private String userId;
     
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(name = "oauth_access_token", nullable = false, columnDefinition = "TEXT")
     private String oauthAccessToken; // OAuth 제공자에서 받은 원본 Access Token
     
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "oauth_refresh_token", columnDefinition = "TEXT")
     private String oauthRefreshToken; // OAuth 제공자에서 받은 원본 Refresh Token
     
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(name = "jwt_access_token", nullable = false, columnDefinition = "TEXT")
     private String jwtAccessToken; // 자체 JWT Access Token
     
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(name = "jwt_refresh_token", nullable = false, columnDefinition = "TEXT")
     private String jwtRefreshToken; // 자체 JWT Refresh Token
     
-    @Column(nullable = false)
+    @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt; // OAuth Access Token 만료 시간
     
-    @Column(nullable = false)
+    @Column(name = "jwt_access_token_expires_at", nullable = false)
     private LocalDateTime jwtAccessTokenExpiresAt; // JWT Access Token 만료 시간
     
-    @Column(nullable = false)
+    @Column(name = "jwt_refresh_token_expires_at", nullable = false)
     private LocalDateTime jwtRefreshTokenExpiresAt; // JWT Refresh Token 만료 시간
     
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
     
     @PrePersist

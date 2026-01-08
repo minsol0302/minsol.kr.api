@@ -13,6 +13,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        # 네이밍 전략: camelCase를 snake_case로 변환
+        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        # 엔티티 스캔 패키지 명시
+        packages_to_scan: kr.minsol.api.services.oauthservice.token.entity
   
   data:
     redis:

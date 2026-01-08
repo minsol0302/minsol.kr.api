@@ -149,11 +149,27 @@ public class RedisConfig {
         // 연결 테스트는 별도 스레드에서 비동기로 처리하여 애플리케이션 시작을 막지 않음
         new Thread(() -> {
             try {
-                Thread.sleep(2000); // 2초 대기 후 테스트 (애플리케이션 시작 후)
-                template.opsForValue().set("connection:test", "ok", 10, java.util.concurrent.TimeUnit.SECONDS);
-                System.out.println("✅ Redis 연결 성공");
+                Thread.sleep(3000); // 3초 대기 후 테스트 (애플리케이션 시작 후)
+                // 연결 테스트 (재시도 로직 포함)
+                int maxRetries = 3;
+                for (int i = 0; i < maxRetries; i++) {
+                    try {
+                        template.getConnectionFactory().getConnection().ping();
+                        template.opsForValue().set("connection:test", "ok", 10, java.util.concurrent.TimeUnit.SECONDS);
+                        System.out.println("✅ Redis 연결 성공");
+                        return;
+                    } catch (Exception e) {
+                        if (i < maxRetries - 1) {
+                            System.out.println("⚠️ Redis 연결 재시도 " + (i + 1) + "/" + maxRetries + ": " + e.getMessage());
+                            Thread.sleep(2000); // 2초 대기 후 재시도
+                        } else {
+                            System.err.println("⚠️ Redis 연결 실패 (계속 진행): " + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    }
+                }
             } catch (Exception e) {
-                System.err.println("⚠️ Redis 연결 실패 (계속 진행): " + e.getMessage());
+                System.err.println("⚠️ Redis 연결 테스트 중 오류 (계속 진행): " + e.getMessage());
                 // Redis 연결 실패해도 애플리케이션은 계속 실행되도록 함
             }
         }).start();
