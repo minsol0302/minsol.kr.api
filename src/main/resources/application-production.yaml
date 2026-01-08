@@ -2,6 +2,27 @@
 # Production 프로파일용 Spring Boot 설정
 # ============================================================================
 
+# Redis 설정 (Upstash Redis - 프로덕션에서 활성화)
+spring:
+  data:
+    redis:
+      enabled: ${REDIS_ENABLED:true}
+      host: ${REDIS_HOST:${UPSTASH_REDIS_HOST}}
+      port: ${REDIS_PORT:${UPSTASH_REDIS_PORT}}
+      password: ${REDIS_PASSWORD:${UPSTASH_REDIS_PASSWORD}}
+      ssl:
+        enabled: ${SPRING_REDIS_SSL_ENABLED:true}
+      timeout: 2000ms
+      lettuce:
+        ssl:
+          enabled: ${SPRING_REDIS_SSL_ENABLED:true}
+          verify-peer: false
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+        shutdown-timeout: 100ms
+
 # SpringDoc OpenAPI (Swagger) 설정 - 프로덕션에서도 활성화
 springdoc:
   api-docs:
