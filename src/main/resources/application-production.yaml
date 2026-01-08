@@ -4,12 +4,23 @@
 
 # Redis 설정 (Upstash Redis - 프로덕션에서 활성화)
 spring:
+  # JPA 설정 - oauth_tokens 테이블 자동 생성
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  
   data:
     redis:
       enabled: ${REDIS_ENABLED:true}
-      host: ${REDIS_HOST:${UPSTASH_REDIS_HOST}}
-      port: ${REDIS_PORT:${UPSTASH_REDIS_PORT}}
-      password: ${REDIS_PASSWORD:${UPSTASH_REDIS_PASSWORD}}
+      url: ${REDIS_URL:${UPSTASH_REDIS_URL:}}
+      host: ${REDIS_HOST:${UPSTASH_REDIS_HOST:localhost}}
+      port: ${REDIS_PORT:${UPSTASH_REDIS_PORT:6379}}
+      password: ${REDIS_PASSWORD:${UPSTASH_REDIS_PASSWORD:}}
       ssl:
         enabled: ${SPRING_REDIS_SSL_ENABLED:true}
       timeout: 2000ms
