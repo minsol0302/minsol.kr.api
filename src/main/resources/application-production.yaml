@@ -1,0 +1,27 @@
+# ============================================================================
+# Production 프로파일용 Spring Boot 설정
+# ============================================================================
+
+# SpringDoc OpenAPI (Swagger) 설정 - 프로덕션에서도 활성화
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /docs
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    use-root-path: false
+    persist-authorization: true
+    urls:
+      - name: Gateway APIs
+        url: /v3/api-docs
+      - name: Transformer Service
+        url: /koelectra/openapi.json
+      - name: ML Service
+        url: /api/mlservice/openapi.json
+  show-actuator: false
+  default-flat-param-object: true
+  writer-with-order-by-keys: true
+
