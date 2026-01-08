@@ -50,7 +50,7 @@ public class RedisConfig {
     public RedisConnectionFactory redisConnectionFactory() {
         try {
             RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-            
+
             // Upstash Redis 설정 (ACL 기반 - username 필수)
             config.setHostName(redisHost);
             config.setPort(redisPort);
@@ -58,14 +58,15 @@ public class RedisConfig {
             if (redisPassword != null && !redisPassword.isEmpty()) {
                 config.setPassword(redisPassword);
             }
-            
-            System.out.println("✅ Redis 설정 완료 - Host: " + redisHost + ", Port: " + redisPort 
-                    + ", Username: " + redisUsername + ", SSL: " + sslEnabled);
+
+            System.out.println("✅ Redis 설정 완료 - Host: " + redisHost + ", Port: " + redisPort
+                    + ", Username: " + redisUsername + ", SSL: " + sslEnabled
+                    + ", Password: " + (redisPassword != null && !redisPassword.isEmpty() ? "***설정됨***" : "없음"));
 
             // LettuceClientConfiguration 빌더
             LettuceClientConfiguration.LettuceClientConfigurationBuilder clientConfigBuilder = LettuceClientConfiguration
                     .builder()
-                    .commandTimeout(Duration.ofSeconds(5))
+                    .commandTimeout(Duration.ofSeconds(10))
                     .shutdownTimeout(Duration.ZERO);
 
             // SSL 설정 (Upstash Redis용 - 필수)
@@ -77,8 +78,9 @@ public class RedisConfig {
                             .build();
 
                     SocketOptions socketOptions = SocketOptions.builder()
-                            .connectTimeout(Duration.ofSeconds(5))
+                            .connectTimeout(Duration.ofSeconds(10))
                             .keepAlive(true)
+                            .tcpNoDelay(true)
                             .build();
 
                     ClientOptions clientOptions = ClientOptions.builder()
@@ -86,8 +88,11 @@ public class RedisConfig {
                             .sslOptions(sslOptions)
                             .build();
 
+                    // ⭐ 핵심: clientOptions를 먼저 설정한 후 useSsl() 호출
                     clientConfigBuilder.clientOptions(clientOptions);
-                    System.out.println("✅ Redis SSL 설정 완료");
+                    clientConfigBuilder.useSsl(); // SSL 활성화
+
+                    System.out.println("✅ Redis SSL 설정 완료 (useSsl 활성화)");
                 } catch (Exception e) {
                     System.err.println("⚠️ Redis SSL 설정 실패: " + e.getMessage());
                     e.printStackTrace();
